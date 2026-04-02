@@ -1,0 +1,4 @@
+1001,프로그래밍기초,3,김교수,MON,900,1030,major_required,active
+1002,자료구조,3,이교수,MON,1000,1130,major_required,active
+1003,영어회화,2,박교수,TUE,1300,1430,general_elective,active
+1004,파이썬프로그래밍,2,최교수,WED,900,1030,major_elective,active

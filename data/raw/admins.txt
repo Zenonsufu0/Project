@@ -1,1 +1,1 @@
-admin,admin123,관리자
+admin01,Admin@1234,관리자

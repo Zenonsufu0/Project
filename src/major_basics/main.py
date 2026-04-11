@@ -38,25 +38,48 @@ def _save_all(store: DataStore, students, admins, courses, enrollments, complete
 
 def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | None:
     college_list = list(colleges.keys())
-    print("단과대학 선택")
-    for i, college in enumerate(college_list, 1):
-        print(f"{i}. {college}")
-    pick = input("번호 선택: ").strip()
-    if not pick.isdigit() or int(pick) < 1 or int(pick) > len(college_list):
-        print("잘못된 선택입니다.")
-        return None
+    
+    # 1. 단과대학 선택 루프
+    while True:
+        print("단과대학 선택")
+        for i, college in enumerate(college_list, 1):
+            print(f"{i}. {college}")
+        
+        pick = input("번호 선택: ").strip()
+        
+        # 아무것도 입력 안 하면 재대기 
+        if not pick:
+            continue
+            
+        if not pick.isdigit() or int(pick) < 1 or int(pick) > len(college_list):
+            # 6.3-13 요구 메시지
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+            continue # 다시 목록 출력 및 입력 대기
+        
+        selected_college = college_list[int(pick) - 1]
+        break # 제대로 골랐으니 단과대 루프 탈출
 
-    college = college_list[int(pick) - 1]
-    majors = colleges[college]
-    print("전공 선택")
-    for i, major in enumerate(majors, 1):
-        print(f"{i}. {major}")
-    mpick = input("번호 선택: ").strip()
-    if not mpick.isdigit() or int(mpick) < 1 or int(mpick) > len(majors):
-        print("잘못된 선택입니다.")
-        return None
+    # 2. 전공 선택 루프
+    majors = colleges[selected_college]
+    while True:
+        print(f"전공 선택")
+        for i, major in enumerate(majors, 1):
+            print(f"{i}. {major}")
+            
+        mpick = input("번호 선택: ").strip()
+        
+        if not mpick:
+            continue
+            
+        if not mpick.isdigit() or int(mpick) < 1 or int(mpick) > len(majors):
+            # 6.3-13 요구 메시지
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+            continue # 다시 목록 출력 및 입력 대기
+            
+        selected_major = majors[int(mpick) - 1]
+        break # 전공까지 골랐으니 최종 탈출
 
-    return college, majors[int(mpick) - 1]
+    return selected_college, selected_major
 
 
 def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = None) -> None:
@@ -323,12 +346,22 @@ def main() -> None:
                 
                 print(f"!!! 오류: {msg}")  # 형식이 틀리면 다시 비밀번호 입력부터
 
-            # 3. 이름 입력 루프
+           # 3. 이름 입력 루프 (6.3-11, 12 대응)
             while True:
                 name = input("이름: ").strip()
-                if name:
+                
+                # 아무것도 입력하지 않았을 때 (공백 포함)
+                if not name:
+                    continue  # 메시지 없이 바로 다시 "이름: "이 뜹니다.
+                
+                # 한글 완성형 형식 검사
+                is_valid, msg = auth_service.validate_name(name)
+                
+                if is_valid:
                     break
-                print("!!! 오류: 이름을 입력해야 합니다.")
+                else:
+                    # "Kim", "ㄱㄴㄷ" 등 형식이 틀렸을 때만 오류 메시지 출력
+                    print(f"!!! 오류: {msg}")
 
             # 4. 단과대 및 전공 선택
             selected = _choose_college_major(colleges)

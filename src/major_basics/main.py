@@ -296,21 +296,51 @@ def main() -> None:
                 _save_all(store, students, admins, courses, enrollments, completed, config)
 
         elif choice == "2":
-            print("=== 회원가입 프롬프트 ===")
-            student_id = input("학번(9자리): ").strip()
-            password = input("비밀번호: ").strip()
-            password_check = input("비밀번호 확인: ").strip()
-            name = input("이름: ").strip()
+            print("\n=== 회원가입 프롬프트 ===")
+            
+            # 1. 학번 즉시 검증 루프
+            while True:
+                student_id = input("학번(9자리): ").strip()
+                is_valid, msg = auth_service.validate_student_id(student_id)
+                if is_valid:
+                    break
+                print(f"!!! 오류: {msg}")
 
+            # 2. 비밀번호 입력 (형식 검사 후 확인 단계로 진입)
+            while True:
+                password = input("비밀번호: ").strip()
+                is_valid, msg = auth_service.validate_password_format(password)
+                
+                if is_valid:
+                    # 비밀번호 형식이 맞을 때만 이 안쪽 루프로 들어옵니다.
+                    while True:
+                        password_check = input("비밀번호 확인: ").strip()
+                        is_match, match_msg = auth_service.validate_password_match(password, password_check)
+                        if is_match:
+                            break  # 비밀번호 확인 일치 시 안쪽 루프 탈출
+                        print(f"!!! 오류: {match_msg}")
+                    break  # 확인까지 완료되면 바깥쪽 비밀번호 루프 탈출
+                
+                print(f"!!! 오류: {msg}")  # 형식이 틀리면 다시 비밀번호 입력부터
+
+            # 3. 이름 입력 루프
+            while True:
+                name = input("이름: ").strip()
+                if name:
+                    break
+                print("!!! 오류: 이름을 입력해야 합니다.")
+
+            # 4. 단과대 및 전공 선택
             selected = _choose_college_major(colleges)
             if selected is None:
                 continue
             college, major = selected
 
+            # 5. 최종 등록 및 저장
             ok, msg, _ = auth_service.signup_student(
                 student_id=student_id,
                 password=password,
-                password_check=password_check,
+                password_check=password_check, # 기존 함수 호환용
                 name=name,
                 college=college,
                 major=major,

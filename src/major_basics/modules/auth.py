@@ -14,30 +14,28 @@ class AuthService:
         self.admins = admins
         self.colleges = colleges
 
-    def signup_student(
-        self,
-        student_id: str,
-        password: str,
-        password_check: str,
-        name: str,
-        college: str,
-        major: str,
-    ) -> tuple[bool, str, Student | None]:
+    # [추가] 실시간 학번 검사
+    def validate_student_id(self, student_id: str) -> tuple[bool, str]:
         if not student_id.isdigit() or len(student_id) != 9:
-            return False, "학번은 숫자 9자리여야 합니다.", None
+            return False, "학번은 숫자 9자리여야 합니다."
         if student_id in self.students or student_id in self.admins:
-            return False, "이미 존재하는 ID입니다.", None
-        if not self._is_valid_password(password):
-            return False, "비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다.", None
-        if password != password_check:
-            return False, "비밀번호 확인이 일치하지 않습니다.", None
-        if not name:
-            return False, "이름을 입력해야 합니다.", None
-        if college not in self.colleges:
-            return False, "존재하지 않는 단과대학입니다.", None
-        if major not in self.colleges[college]:
-            return False, "선택한 단과대학에 없는 전공입니다.", None
+            return False, "이미 존재하는 ID입니다."
+        return True, "사용 가능한 학번입니다."
 
+   # [추가] 1단계: 비밀번호 형식만 체크
+    def validate_password_format(self, password: str) -> tuple[bool, str]:
+        if not self._is_valid_password(password):
+            return False, "비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다."
+        return True, "사용 가능한 형식입니다."
+
+    # [추가] 2단계: 비밀번호 일치 여부만 체크
+    def validate_password_match(self, password: str, password_check: str) -> tuple[bool, str]:
+        if password != password_check:
+            return False, "비밀번호 확인이 일치하지 않습니다."
+        return True, "비밀번호가 일치합니다."
+
+    # 기존 함수 유지 (매개변수 password_check는 내부 로직용으로 남겨둠)
+    def signup_student(self, student_id, password, password_check, name, college, major):
         student = Student(student_id, password, name, college, major, "active")
         self.students[student.student_id] = student
         return True, "회원가입 완료", student

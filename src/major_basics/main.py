@@ -10,7 +10,11 @@ from major_basics.modules.student_service import StudentService
 
 def _parse_date(value: str) -> date | None:
     try:
-        return date.fromisoformat(value)
+        parsed_date = date.fromisoformat(value)
+        # 5.2.5절 허용 범위 제한 로직 추가
+        if not (date(2000, 1, 1) <= parsed_date <= date(2099, 12, 31)):
+            return None
+        return parsed_date
     except ValueError:
         return None
 
@@ -167,7 +171,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             print("로그아웃합니다.")
             break
         else:
-            print("올바른 번호를 입력하세요.")
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
 def _input_course() -> Course | None:
@@ -221,11 +225,13 @@ def _admin_menu(admin_service: AdminService) -> None:
             _, msg = admin_service.register_student(Student(sid, pw, name, college, major, "active"))
             print(msg)
         elif choice == "2":
-            sid = input("삭제할 학번: ").strip()
+            print("===== 학생 삭제 ===== \n")
+            sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
             _, msg = admin_service.delete_student(sid)
             print(msg)
         elif choice == "3":
-            sid = input("활성화할 학번: ").strip()
+            print("===== 학생 활성화 =====")
+            sid = input("활성화할 학생의 학번 입력 (0: 돌아가기) > ").strip()
             _, msg = admin_service.activate_student(sid)
             print(msg)
         elif choice == "4":
@@ -241,20 +247,23 @@ def _admin_menu(admin_service: AdminService) -> None:
             _, msg = admin_service.update_course(course)
             print(msg)
         elif choice == "6":
-            code = input("삭제 과목코드: ").strip()
-            section = input("삭제 분반코드: ").strip()
+            print("===== 강의 삭제 =====")
+            code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
+            section = input("삭제할 분반코드 입력 > ").strip()
             _, msg = admin_service.delete_course(code, section)
             print(msg)
         elif choice == "7":
-            code = input("활성화 과목코드: ").strip()
-            section = input("활성화 분반코드: ").strip()
+            print("===== 강의 활성화 =====")
+            code = input("활성화할 과목코드 입력 (0: 돌아가기) > ").strip()
+            section = input("활성화할 분반코드 입력 > ").strip()
             _, msg = admin_service.activate_course(code, section)
             print(msg)
         elif choice == "8":
-            print("과목코드 | 분반 | 과목명 | 정원 | 신청인원")
+            print("===== 전체 수강 현황 =====\n과목코드 | 분반 | 과목명 | 정원 | 신청인원")
             for course, count in admin_service.enrollment_summary():
                 print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}")
         elif choice == "9":
+            print("===== 수강신청 기간 설정 =====")
             start_s = input("수강신청 시작일(YYYY-MM-DD): ").strip()
             end_s = input("수강신청 종료일(YYYY-MM-DD): ").strip()
             start = _parse_date(start_s)
@@ -297,15 +306,16 @@ def main() -> None:
     auth_service = AuthService(students, admins, colleges)
 
     while True:
-        print("\n=== 로그인 / 회원가입 선택 ===")
+        print("\n========================================\n   건국 수강신청 시뮬레이터\n========================================")
         print("1. 로그인")
         print("2. 회원가입")
         print("0. 종료")
-        choice = input("선택: ").strip()
+        print("----------------------------------------")
+        choice = input("선택 > ").strip()
 
         if choice == "1":
-            user_id = input("ID(학번 또는 관리자ID): ").strip()
-            password = input("비밀번호: ").strip()
+            user_id = input("\n---------------------------------------- \nID(학번 또는 관리자ID) > ").strip()
+            password = input("비밀번호 > ").strip()
             role, user, msg = auth_service.login(user_id, password)
             print(msg)
 
@@ -319,11 +329,11 @@ def main() -> None:
                 _save_all(store, students, admins, courses, enrollments, completed, config)
 
         elif choice == "2":
-            print("\n=== 회원가입 프롬프트 ===")
+            print("\n===== 회원가입 프롬프트 =====")
             
             # 1. 학번 즉시 검증 루프
             while True:
-                student_id = input("학번(9자리): ").strip()
+                student_id = input("학번 (숫자 9자리) > ").strip()
                 is_valid, msg = auth_service.validate_student_id(student_id)
                 if is_valid:
                     break
@@ -331,7 +341,7 @@ def main() -> None:
 
             # 2. 비밀번호 입력 (형식 검사 후 확인 단계로 진입)
             while True:
-                password = input("비밀번호: ").strip()
+                password = input("비밀번호 > ").strip()
                 is_valid, msg = auth_service.validate_password_format(password)
                 
                 if is_valid:
@@ -348,7 +358,7 @@ def main() -> None:
 
            # 3. 이름 입력 루프 (6.3-11, 12 대응)
             while True:
-                name = input("이름: ").strip()
+                name = input("이름 (한국어 완성형) > ").strip()
                 
                 # 아무것도 입력하지 않았을 때 (공백 포함)
                 if not name:
@@ -387,7 +397,7 @@ def main() -> None:
             print("프로그램을 종료합니다.")
             break
         else:
-            print("올바른 번호를 입력하세요.")
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
 if __name__ == "__main__":

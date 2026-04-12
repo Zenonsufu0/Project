@@ -1,4 +1,5 @@
-﻿from datetime import date
+﻿import getpass
+from datetime import date
 from pathlib import Path
 
 from major_basics.modules.admin_service import AdminService
@@ -342,7 +343,7 @@ def main() -> None:
             # 2. 비밀번호 입력 (형식 검사 후 확인 단계로 진입)
             while True:
                 password = input("비밀번호 > ").strip()
-                is_valid, msg = auth_service.validate_password_format(password)
+                is_valid, msg = auth_service.validate_password_format(password, user_type="student")
                 
                 if is_valid:
                     # 비밀번호 형식이 맞을 때만 이 안쪽 루프로 들어옵니다.

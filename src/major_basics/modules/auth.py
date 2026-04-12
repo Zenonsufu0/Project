@@ -22,10 +22,18 @@ class AuthService:
             return False, "이미 존재하는 학번입니다."
         return True, "사용 가능한 학번입니다."
 
-   # [추가] 1단계: 비밀번호 형식만 체크
-    def validate_password_format(self, password: str) -> tuple[bool, str]:
-        if not self._is_valid_password(password):
-            return False, "비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다."
+   # [수정] 1단계: 사용자 타입에 따른 비밀번호 형식 체크
+    def validate_password_format(self, password: str, user_type: str = "student") -> tuple[bool, str]:
+        # 1. 학생: 기획서 내용 (영문 대소문자/숫자로만 구성된 6자 이상 12자 이하)
+        if user_type == "student":
+            if not re.fullmatch(r"[A-Za-z0-9]{6,12}", password):
+                return False, "비밀번호는 영문 대소문자와 숫자로만 구성된 6자 이상 12자 이하의 문자열이어야 합니다."
+        
+        # 2. 관리자: 기존의 엄격한 규칙 (8~16자, 대소문자/숫자/특수문자 포함)2
+        else:
+            if not self._is_valid_password(password):
+                return False, "관리자 비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다."
+        
         return True, "사용 가능한 형식입니다."
 
     # [추가] 2단계: 비밀번호 일치 여부만 체크
@@ -62,7 +70,7 @@ class AuthService:
                 return "none", None, "비밀번호가 올바르지 않습니다."
             return "admin", admin, "관리자 로그인 성공"
 
-        return "none", None, "존재하지 않는 ID입니다."
+        return "none", None, "존재하지 않는 계정입니다."
 
     @staticmethod
     def _is_valid_password(value: str) -> bool:

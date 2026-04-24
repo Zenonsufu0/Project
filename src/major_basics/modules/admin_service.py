@@ -1,4 +1,4 @@
-﻿from datetime import date
+from datetime import date
 
 from major_basics.modules.models import Config, Course, Enrollment, Student
 
@@ -83,6 +83,12 @@ class AdminService:
         return True, f"강의 수정 완료: {course.name} ({course.code}-{course.section})"
 
     def delete_course(self, code: str, section: str) -> tuple[bool, str]:
+        if not (len(code) == 4 and all("0" <= ch <= "9" for ch in code)):
+            return False, "과목코드는 숫자 4자리여야 합니다."
+
+        if not (len(section) == 2 and all("0" <= ch <= "9" for ch in section)):
+            return False, "분반코드는 숫자 2자리여야 합니다."
+
         key = (code, section)
 
         if key not in self.courses:
@@ -95,6 +101,12 @@ class AdminService:
         return True, f"강의 삭제 완료: {self.courses[key].name} ({code}-{section}) → inactive 처리됨"
 
     def activate_course(self, code: str, section: str) -> tuple[bool, str]:
+        if not (len(code) == 4 and all("0" <= ch <= "9" for ch in code)):
+            return False, "과목코드는 숫자 4자리여야 합니다."
+
+        if not (len(section) == 2 and all("0" <= ch <= "9" for ch in section)):
+            return False, "분반코드는 숫자 2자리여야 합니다."
+
         key = (code, section)
         course = self.courses.get(key)
 
@@ -108,6 +120,12 @@ class AdminService:
         return True, f"강의 활성화 완료: {course.name} ({code}-{section})"
 
     def set_registration_period(self, start: date, end: date) -> tuple[bool, str]:
+        if start < date(2000, 1, 1) or start > date(2099, 12, 31):
+            return False, "날짜 형식이 올바르지 않습니다."
+
+        if end < date(2000, 1, 1) or end > date(2099, 12, 31):
+            return False, "날짜 형식이 올바르지 않습니다."
+
         if end < start:
             return False, "종료일은 시작일과 같거나 이후여야 합니다."
 
@@ -136,19 +154,19 @@ class AdminService:
 
     @staticmethod
     def _validate_course_fields(course: Course) -> tuple[bool, str]:
-        if not (course.code.isdigit() and len(course.code) == 4):
+        if not (len(course.code) == 4 and all("0" <= ch <= "9" for ch in course.code)):
             return False, "과목코드는 숫자 4자리여야 합니다."
 
-        if not (course.section.isdigit() and len(course.section) == 2):
+        if not (len(course.section) == 2 and all("0" <= ch <= "9" for ch in course.section)):
             return False, "분반코드는 숫자 2자리여야 합니다."
 
-        if not course.name:
+        if not course.name or "\t" in course.name or "\n" in course.name or "\r" in course.name:
             return False, "과목명은 비어 있을 수 없습니다."
 
         if course.credits < 1 or course.credits > 6:
             return False, "학점은 1~6 정수이어야 합니다."
 
-        if not course.professor:
+        if not course.professor or "\t" in course.professor or "\n" in course.professor or "\r" in course.professor:
             return False, "담당교수는 비어 있을 수 없습니다."
 
         if course.day not in {"MON", "TUE", "WED", "THU", "FRI"}:

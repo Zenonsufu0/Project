@@ -22,18 +22,18 @@ class AuthService:
             return False, "이미 존재하는 학번입니다."
         return True, "사용 가능한 학번입니다."
 
-   # [수정] 1단계: 사용자 타입에 따른 비밀번호 형식 체크
+   # 1단계: 사용자 타입에 따른 비밀번호 형식 체크
     def validate_password_format(self, password: str, user_type: str = "student") -> tuple[bool, str]:
-        # 1. 학생: 기획서 내용 (영문 대소문자/숫자로만 구성된 6자 이상 12자 이하)
+        # 학생: 영문 대소문자와 숫자, 6~12자, 영문자와 숫자 각 최소 1자 이상 포함
         if user_type == "student":
-            if not re.fullmatch(r"[A-Za-z0-9]{6,12}", password):
-                return False, "비밀번호는 영문 대소문자와 숫자로만 구성된 6자 이상 12자 이하의 문자열이어야 합니다."
-        
-        # 2. 관리자: 기존의 엄격한 규칙 (8~16자, 대소문자/숫자/특수문자 포함)2
+            if not re.fullmatch(r"(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{6,12}", password):
+                return False, "비밀번호는 영문자와 숫자를 각각 1자 이상 포함한 6~12자이어야 합니다."
+
+        # 관리자: 영문 대소문자, 숫자, 특수문자(!@#$%^&*), 8~16자, 세 종류 각 최소 1자 이상
         else:
-            if not self._is_valid_password(password):
-                return False, "관리자 비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다."
-        
+            if not self._is_valid_admin_password(password):
+                return False, "관리자 비밀번호는 영문자, 숫자, 특수문자(!@#$%^&*)를 각각 1자 이상 포함한 8~16자이어야 합니다."
+
         return True, "사용 가능한 형식입니다."
 
     # [추가] 2단계: 비밀번호 일치 여부만 체크
@@ -58,23 +58,23 @@ class AuthService:
     def login(self, user_id: str, password: str) -> tuple[str, object | None, str]:
         student = self.students.get(user_id)
         if student:
-            if student.password != password:
-                return "none", None, "비밀번호가 올바르지 않습니다."
             if student.status != "active":
-                return "none", None, "비활성 학생 계정입니다. 관리자에게 문의하세요."
+                return "none", None, "!!! 오류: 비활성화된 계정입니다."
+            if student.password != password:
+                return "none", None, "!!! 오류: 비밀번호가 틀렸습니다."
             return "student", student, "학생 로그인 성공"
 
         admin = self.admins.get(user_id)
         if admin:
             if admin.password != password:
-                return "none", None, "비밀번호가 올바르지 않습니다."
+                return "none", None, "!!! 오류: 비밀번호가 틀렸습니다."
             return "admin", admin, "관리자 로그인 성공"
 
-        return "none", None, "존재하지 않는 계정입니다."
+        return "none", None, "!!! 오류: 존재하지 않는 계정입니다."
 
     @staticmethod
-    def _is_valid_password(value: str) -> bool:
-        if len(value) < 8 or len(value) > 16:
+    def _is_valid_admin_password(value: str) -> bool:
+        if not re.fullmatch(r"[A-Za-z0-9!@#$%^&*]{8,16}", value):
             return False
-        patterns = [r"[A-Z]", r"[a-z]", r"\d", r"[^A-Za-z0-9]"]
+        patterns = [r"[A-Za-z]", r"\d", r"[!@#$%^&*]"]
         return all(re.search(pat, value) for pat in patterns)

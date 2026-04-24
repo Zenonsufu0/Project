@@ -1,4 +1,4 @@
-﻿from major_basics.modules.models import Config, Course, DAY_ORDER, Enrollment, Student
+from major_basics.modules.models import Config, Course, DAY_ORDER, Enrollment, Student
 
 
 class StudentService:
@@ -27,7 +27,7 @@ class StudentService:
         return [
             course
             for course in self.list_courses()
-            if key in course.code.lower() or key in course.section.lower() or key in course.name.lower()
+            if key in course.name.lower()
         ]
 
     def list_completed(self) -> list[str]:
@@ -35,60 +35,88 @@ class StudentService:
 
     def add_completed(self, course_code: str) -> tuple[bool, str]:
         if not self._course_code_exists(course_code):
-            return False, "존재하지 않는 과목코드입니다."
+            return False, "!!! 오류: 존재하지 않는 과목코드입니다."
 
         bucket = self.completed.setdefault(self.student.student_id, set())
         if course_code in bucket:
-            return False, "이미 기이수 과목으로 등록되어 있습니다."
+            return False, "!!! 오류: 이미 기이수 처리된 과목입니다."
 
         bucket.add(course_code)
-        return True, "기이수 과목 등록 완료"
+        return True, "✓ 기이수 과목 등록 완료"
 
-    def register(self, course_code: str, section: str) -> tuple[bool, str]:
+    def is_retake(self, course_code: str) -> bool:
+        return course_code in self.completed.get(self.student.student_id, set())
+
+    def register(self, course_code: str, section: str) -> tuple[bool, str, bool]:
+        """Returns (ok, message, is_retake). Checks follow 기획서 6.9 순서."""
         if not self.is_registration_open():
-            return False, "수강신청 기간이 아닙니다."
+            return False, "!!! 안내: 현재 수강신청 기간이 아닙니다.", False
 
+        # 1단계 — 과목 존재 여부 확인
+        if not self._course_code_exists(course_code):
+            return False, "!!! 오류: 존재하지 않는 과목코드입니다.", False
+
+        # 2단계 — 분반 존재 여부 확인
         key = (course_code, section)
         course = self.courses.get(key)
-        if not course or course.status != "active":
-            return False, "신청 가능한 강의가 아닙니다."
+        if not course:
+            return False, "!!! 오류: 존재하지 않는 분반입니다.", False
 
-        if key in self._active_enrolled_map():
-            return False, "이미 신청한 강의입니다."
+        # 3단계 — active 상태 확인
+        if course.status != "active":
+            return False, "!!! 오류: 현재 신청 불가능한(inactive) 과목입니다.", False
 
-        if self.current_credits() + course.credits > self.MAX_CREDITS:
-            return False, "최대 신청 학점(18학점)을 초과합니다."
+        # 4단계 — 중복 신청 확인 (같은 과목코드 기준 — 다른 분반 포함)
+        active_map = self._active_enrolled_map()
+        if key in active_map:
+            return False, "!!! 오류: 이미 신청한 과목입니다.", False
+        for (c, _s) in active_map.keys():
+            if c == course_code:
+                return False, "!!! 오류: 이미 신청한 과목입니다.", False
 
+        # 5단계 — 정원 초과 확인
         if self._count_course_enrolled(key) >= course.capacity:
-            return False, "정원이 가득 찼습니다."
+            return False, "!!! 오류: 해당 과목의 정원이 마감되었습니다.", False
 
+        # 6단계 — 시간표 충돌 확인
         conflict = self._find_time_conflict(course)
         if conflict is not None:
-            return False, f"시간표 충돌: {conflict.code}-{conflict.section} {conflict.time_text()}"
+            return (
+                False,
+                f"!!! 오류: 시간표 충돌 - {conflict.name} ({conflict.day} {conflict.time_text()})과 겹칩니다.",
+                False,
+            )
 
-        is_retake = course_code in self.completed.get(self.student.student_id, set())
+        # 7단계 — 최대 학점 확인
+        if self.current_credits() + course.credits > self.MAX_CREDITS:
+            return False, f"!!! 오류: 최대 신청 학점({self.MAX_CREDITS})을 초과합니다.", False
+
         self.enrollments.append(
-            Enrollment(self.student.student_id, course_code, section, "enrolled", is_retake)
+            Enrollment(self.student.student_id, course_code, section, "enrolled")
         )
 
-        if is_retake:
-            return True, "수강신청 완료 (재수강 Y)"
-        return True, "수강신청 완료"
+        retake = self.is_retake(course_code)
+        message = f"✓ 수강신청 완료: {course.name}"
+        if retake:
+            message += "\n안내: 재수강 과목입니다."
+        return True, message, retake
 
     def cancel(self, course_code: str, section: str) -> tuple[bool, str]:
         if not self.is_registration_open():
-            return False, "수강신청 기간이 아닙니다."
+            return False, "!!! 안내: 현재 수강신청 기간이 아닙니다."
 
         key = (course_code, section)
         active = self._active_enrolled_map()
-        record = active.get(key)
-        if record is None:
-            return False, "현재 신청 상태가 아닙니다."
+        if key not in active:
+            return False, "!!! 오류: 현재 신청 상태가 아닙니다."
+
+        course = self.courses.get(key)
+        name = course.name if course else f"{course_code}-{section}"
 
         self.enrollments.append(
-            Enrollment(self.student.student_id, course_code, section, "cancelled", record.is_retake)
+            Enrollment(self.student.student_id, course_code, section, "cancelled")
         )
-        return True, "수강취소 완료"
+        return True, f"✓ 수강취소 완료: {name}"
 
     def enrollment_history(self) -> list[Enrollment]:
         return [enrollment for enrollment in self.enrollments if enrollment.student_id == self.student.student_id]

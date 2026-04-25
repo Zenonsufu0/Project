@@ -244,6 +244,7 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
         choice = input("선택: ").strip()
 
         if choice == "1":
+            print("===== 학생 등록 ===== ")
             sid = input("학번(9자리): ").strip()
             pw = input("비밀번호: ").strip()
             name = input("이름: ").strip()
@@ -254,7 +255,7 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
             _, msg = admin_service.register_student(Student(sid, pw, name, college, major, "active"))
             print(msg)
         elif choice == "2":
-            print("===== 학생 삭제 ===== \n")
+            print("===== 학생 삭제 ===== ")
             sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
             _, msg = admin_service.delete_student(sid)
             print(msg)

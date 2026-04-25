@@ -343,20 +343,42 @@ def main() -> None:
         choice = input("선택 > ").strip()
 
         if choice == "1":
-            user_id = input("\n---------------------------------------- \nID(학번 또는 관리자ID) > ").strip()
-            password = input("비밀번호 > ").strip()
-            role, user, msg = auth_service.login(user_id, password)
-            print(msg)
+            first = True  # ← while 루프 밖으로 꺼내기
+            while True:
+                while True:
+                    prompt = "\n---------------------------------------- \nID(학번 또는 관리자ID) > " if first else "ID(학번 또는 관리자ID) > "
+                    user_id = input(prompt).strip()
+                    first = False
+                    if user_id in students or user_id in admins:
+                        break
+                    print("!!! 오류: 존재하지 않는 계정입니다.")
 
-            if role == "student":
-                student_service = StudentService(user, courses, enrollments, completed, config)
-                _student_menu(student_service, courses, enrollments)
-                _save_all(store, students, admins, courses, enrollments, completed, config)
-            elif role == "admin":
-                admin_service = AdminService(students, courses, enrollments, completed, colleges, config)
-                _admin_menu(admin_service, user_id)
-                _save_all(store, students, admins, courses, enrollments, completed, config)
+                go_back = False
+                while True:
+                    password = input("비밀번호 > ").strip()
+                    role, user, msg = auth_service.login(user_id, password)
 
+                    if role == "student":
+                        print(msg)
+                        student_service = StudentService(user, courses, enrollments, completed, config)
+                        _student_menu(student_service, courses, enrollments)
+                        _save_all(store, students, admins, courses, enrollments, completed, config)
+                        break
+                    elif role == "admin":
+                        print(msg)
+                        admin_service = AdminService(students, courses, enrollments, completed, colleges, config)
+                        _admin_menu(admin_service, user_id)
+                        _save_all(store, students, admins, courses, enrollments, completed, config)
+                        break
+                    else:
+                        print(f"!!! 오류: {msg}")
+                        if "비활성" in msg:
+                            go_back = True
+                            break
+
+                if not go_back:
+                    break
+                
         elif choice == "2":
             print("\n===== 회원가입 =====")
             

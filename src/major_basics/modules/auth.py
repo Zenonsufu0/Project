@@ -23,24 +23,28 @@ class AuthService:
         return True, "사용 가능한 학번입니다."
 
    # [수정] 1단계: 사용자 타입에 따른 비밀번호 형식 체크
+  # [수정된 부분] AuthService 클래스 내부에 위치해야 하므로 한 번 들여쓰기 되어야 합니다.
     def validate_password_format(self, password: str, user_type: str = "student") -> tuple[bool, str]:
-        # 1. 학생: 기획서 내용 (영문 대소문자/숫자로만 구성된 6자 이상 12자 이하)
+        # 1. 학생용 검사
         if user_type == "student":
+            # (1) 길이와 허용 문자 종류만 먼저 확인
             if not re.fullmatch(r"[A-Za-z0-9]{6,12}", password):
-                return False, "비밀번호는 영문 대소문자와 숫자로만 구성된 6자 이상 12자 이하의 문자열이어야 합니다."
-        
-        # 2. 관리자: 기존의 엄격한 규칙 (8~16자, 대소문자/숫자/특수문자 포함)2
+                return False, "비밀번호는 영문 대소문자와 숫자로만 구성된 6~12자여야 합니다."
+            
+            # (2) 영문자와 숫자가 각각 들어있는지 확인
+            has_letter = any(c.isalpha() for c in password)
+            has_digit = any(c.isdigit() for c in password)
+            
+            if not (has_letter and has_digit):
+                return False, "비밀번호는 영문자와 숫자를 각각 1자 이상 포함한 6~12자이어야 합니다."
+
+        # 2. 관리자용 검사
         else:
             if not self._is_valid_password(password):
                 return False, "관리자 비밀번호는 8~16자, 영문 대/소문자, 숫자, 특수문자를 포함해야 합니다."
         
         return True, "사용 가능한 형식입니다."
 
-    # [추가] 2단계: 비밀번호 일치 여부만 체크
-    def validate_password_match(self, password: str, password_check: str) -> tuple[bool, str]:
-        if password != password_check:
-            return False, "비밀번호 확인이 일치하지 않습니다."
-        return True, "비밀번호가 일치합니다."
    
     # [추가] 실시간 이름 형식 검사 (6.3-11, 12 대응)
     def validate_name(self, name: str) -> tuple[bool, str]:
@@ -50,7 +54,7 @@ class AuthService:
         return True, "사용 가능한 이름입니다."
 
     # 기존 함수 유지 (매개변수 password_check는 내부 로직용으로 남겨둠)
-    def signup_student(self, student_id, password, password_check, name, college, major):
+    def signup_student(self, student_id, password, name, college, major):
         student = Student(student_id, password, name, college, major, "active")
         self.students[student.student_id] = student
         return True, "회원가입 완료", student

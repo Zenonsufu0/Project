@@ -340,22 +340,17 @@ def main() -> None:
                     break
                 print(f"!!! 오류: {msg}")
 
-            # 2. 비밀번호 입력 (형식 검사 후 확인 단계로 진입)
+            # 2. 비밀번호 입력 (형식 검사 후 바로 통과)
             while True:
                 password = input("비밀번호 > ").strip()
                 is_valid, msg = auth_service.validate_password_format(password, user_type="student")
                 
                 if is_valid:
-                    # 비밀번호 형식이 맞을 때만 이 안쪽 루프로 들어옵니다.
-                    while True:
-                        password_check = input("비밀번호 확인: ").strip()
-                        is_match, match_msg = auth_service.validate_password_match(password, password_check)
-                        if is_match:
-                            break  # 비밀번호 확인 일치 시 안쪽 루프 탈출
-                        print(f"!!! 오류: {match_msg}")
-                    break  # 확인까지 완료되면 바깥쪽 비밀번호 루프 탈출
+                    # 형식이 맞으면 다음 단계(이름 입력)로 넘어갑니다.
+                    break 
                 
-                print(f"!!! 오류: {msg}")  # 형식이 틀리면 다시 비밀번호 입력부터
+                # 형식이 틀렸을 때만 오류 메시지를 출력하고 다시 입력받습니다.
+                print(f"!!! 오류: {msg}")
 
            # 3. 이름 입력 루프 (6.3-11, 12 대응)
             while True:
@@ -384,7 +379,6 @@ def main() -> None:
             ok, msg, _ = auth_service.signup_student(
                 student_id=student_id,
                 password=password,
-                password_check=password_check, # 기존 함수 호환용
                 name=name,
                 college=college,
                 major=major,

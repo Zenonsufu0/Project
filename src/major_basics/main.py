@@ -264,12 +264,14 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
             _, msg = admin_service.activate_student(sid)
             print(msg)
         elif choice == "4":
+            print("===== 강의 등록 =====")
             course = _input_course()
             if course is None:
                 continue
             _, msg = admin_service.add_course(course)
             print(msg)
         elif choice == "5":
+            print("===== 강의 수정 =====")
             course = _input_course()
             if course is None:
                 continue

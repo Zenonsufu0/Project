@@ -29,7 +29,7 @@ class AuthService:
         if user_type == "student":
             # (1) 길이와 허용 문자 종류만 먼저 확인
             if not re.fullmatch(r"[A-Za-z0-9]{6,12}", password):
-                return False, "비밀번호는 영문 대소문자와 숫자로만 구성된 6~12자여야 합니다."
+                return False, "비밀번호는 영문자와 숫자를 각각 1자 이상 포함한 6~12자이어야 합니다."
             
             # (2) 영문자와 숫자가 각각 들어있는지 확인
             has_letter = any(c.isalpha() for c in password)

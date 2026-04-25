@@ -98,10 +98,37 @@ def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = 
             f"{course.day} | {course.time_text()} | {course.professor} | {course.capacity} | {now}"
         )
 
+def _format_date(d):
+    return d.isoformat()
+
+
+def _student_header(student_service: StudentService) -> None:
+    student = student_service.student
+    config = student_service.config
+
+    print("-" * 45)
+    print(f"[학생 메뉴] {student.name} ({student.student_id})")
+    print(
+        f"현재 신청 학점: {student_service.current_credits()} / 18"
+        f"  |  수강신청 기간: {_format_date(config.reg_start)} ~ {_format_date(config.reg_end)}"
+    )
+    print("-" * 45)
+
+
+def _admin_header(admin_id: str, config) -> None:
+    print("-" * 45)
+    print(f"[관리자 메뉴] 관리자 ({admin_id})")
+    print(
+        f"오늘 날짜: {_format_date(config.current_date)}"
+        f"  |  수강신청 기간: {_format_date(config.reg_start)} ~ {_format_date(config.reg_end)}"
+    )
+    print("-" * 45)
+
 
 def _student_menu(student_service: StudentService, courses: dict, enrollments: list) -> None:
     while True:
-        print("\n=== 학생 메인 메뉴 ===")
+        _student_header(student_service)
+
         print("1. 개설 과목 전체 조회")
         print("2. 과목 검색")
         print("3. 기이수 과목 조회")
@@ -200,9 +227,10 @@ def _input_course() -> Course | None:
     return Course(code, section, name, int(credits_s), professor, day, start, end, status, int(capacity_s))
 
 
-def _admin_menu(admin_service: AdminService) -> None:
+def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
     while True:
-        print("\n=== 관리자 메인 메뉴 ===")
+        _admin_header(admin_id, admin_service.config)
+
         print("1. 학생 등록")
         print("2. 학생 삭제")
         print("3. 학생 활성화")
@@ -278,7 +306,7 @@ def _admin_menu(admin_service: AdminService) -> None:
             print("로그아웃합니다.")
             break
         else:
-            print("올바른 번호를 입력하세요.")
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
 def main() -> None:
@@ -326,11 +354,11 @@ def main() -> None:
                 _save_all(store, students, admins, courses, enrollments, completed, config)
             elif role == "admin":
                 admin_service = AdminService(students, courses, enrollments, completed, colleges, config)
-                _admin_menu(admin_service)
+                _admin_menu(admin_service, user_id)
                 _save_all(store, students, admins, courses, enrollments, completed, config)
 
         elif choice == "2":
-            print("\n===== 회원가입 프롬프트 =====")
+            print("\n===== 회원가입 =====")
             
             # 1. 학번 즉시 검증 루프
             while True:

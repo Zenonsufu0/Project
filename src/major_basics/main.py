@@ -50,7 +50,7 @@ def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | N
         for i, college in enumerate(college_list, 1):
             print(f"{i}. {college}")
         
-        pick = input("번호 선택: ").strip()
+        pick = input("번호 선택 > ").strip()
         
         # 아무것도 입력 안 하면 재대기 
         if not pick:
@@ -71,7 +71,7 @@ def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | N
         for i, major in enumerate(majors, 1):
             print(f"{i}. {major}")
             
-        mpick = input("번호 선택: ").strip()
+        mpick = input("번호 선택 > ").strip()
         
         if not mpick:
             continue

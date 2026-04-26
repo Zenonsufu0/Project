@@ -489,9 +489,22 @@ def main() -> None:
 
         if choice == "1":
             print("----------------------------------------")
-            user_id = input("ID (학번 또는 관리자 ID) > ").strip()
-            password = _input_password("비밀번호 > ")
-            role, user, msg = auth_service.login(user_id, password)
+            # 기획서 6.4: ID 오류 → ID 재입력, 비밀번호 오류 → 비밀번호만 재입력
+            role, user, msg = "none", None, ""
+            while True:
+                user_id = input("ID (학번 또는 관리자 ID) > ").strip()
+                id_ok, id_err = auth_service.check_user_id(user_id)
+                if not id_ok:
+                    print(id_err)
+                    continue
+                while True:
+                    password = _input_password("비밀번호 > ")
+                    role, user, msg = auth_service.login(user_id, password)
+                    if role == "none":
+                        print(msg)
+                        continue
+                    break
+                break
             print(msg)
 
             if role == "student":

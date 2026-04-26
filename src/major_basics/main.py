@@ -7,7 +7,7 @@ from pathlib import Path
 from major_basics.modules.admin_service import AdminService
 from major_basics.modules.auth import AuthService
 from major_basics.modules.models import Course, Student
-from major_basics.modules.storage import DataStore
+from major_basics.modules.storage import DataStore, IntegrityError
 from major_basics.modules.student_service import StudentService
 
 
@@ -770,7 +770,12 @@ def main() -> None:
     courses = store.load_courses()
     enrollments = store.load_enrollments()
     completed = store.load_completed()
-    colleges = store.load_colleges()
+    try:
+        colleges = store.load_colleges()
+    except IntegrityError as e:
+        print(f"!!! 오류: {e}")
+        print("프로그램을 종료합니다.")
+        return
     config = store.load_config(current_date)
     config.current_date = current_date
 

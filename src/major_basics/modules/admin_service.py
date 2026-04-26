@@ -35,7 +35,7 @@ class AdminService:
         if student.status not in ("active", "inactive"):
             return False, "!!! 오류: 상태 값이 올바르지 않습니다."
         self.students[student.student_id] = student
-        return True, "✓ 학생 등록 완료"
+        return True, f"✓ 학생 등록 완료: {student.name} ({student.student_id})"
 
     def delete_student(self, student_id: str) -> tuple[bool, str]:
         student = self.students.get(student_id)
@@ -44,7 +44,7 @@ class AdminService:
         if student.status == "inactive":
             return False, "!!! 안내: 이미 inactive 상태의 학생입니다."
         student.status = "inactive"
-        return True, f"✓ 학생 삭제 완료: {student_id} (inactive 처리됨)"
+        return True, f"✓ 학생 삭제 완료: {student_id}"
 
     def activate_student(self, student_id: str) -> tuple[bool, str]:
         student = self.students.get(student_id)
@@ -90,7 +90,7 @@ class AdminService:
         if course.status == "inactive":
             return False, "!!! 안내: 이미 inactive 상태의 강의입니다."
         course.status = "inactive"
-        return True, f"✓ 강의 삭제 완료: {course.name} ({code}-{section}) → inactive 처리됨"
+        return True, f"✓ 강의 삭제 완료: {course.name} ({code}-{section})"
 
     def activate_course(self, code: str, section: str) -> tuple[bool, str]:
         if not (code.isdigit() and len(code) == 4):

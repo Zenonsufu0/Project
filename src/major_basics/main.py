@@ -117,21 +117,31 @@ def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | N
     return selected_college, selected_major
 
 
-def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = None) -> None:
+def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = None, show_capacity: bool = True) -> None:
     if not courses:
         print("조회 결과가 없습니다.")
         return
-    print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수 | 정원")
+    if show_capacity:
+        print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수 | 정원")
+    else:
+        # 기획서 6.7.2: 과목 검색 결과는 정원 열 미표시
+        print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수")
     for i, course in enumerate(courses, 1):
-        now = current_counts[course.key()] if current_counts and course.key() in current_counts else 0
-        print(
-            f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
-            f"{course.day} | {course.time_text()} | {course.professor} | {course.capacity} (현재 {now})"
-        )
+        if show_capacity:
+            now = current_counts[course.key()] if current_counts and course.key() in current_counts else 0
+            print(
+                f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
+                f"{course.day} | {course.time_text()} | {course.professor} | {course.capacity} (현재 {now})"
+            )
+        else:
+            print(
+                f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
+                f"{course.day} | {course.time_text()} | {course.professor}"
+            )
 
 
 def _search_and_select_course(student_service: StudentService) -> Course | None:
-    """기획서 6.4.2: 과목명 검색 → 번호 선택 → Course 반환 (0: 돌아가기 → None)."""
+    """기획서 6.7.2: 과목명 검색 → 번호 선택 → Course 반환 (0: 돌아가기 → None)."""
     while True:
         keyword = input("과목명 검색어 > ").strip()
         results = student_service.search_courses(keyword)
@@ -141,7 +151,7 @@ def _search_and_select_course(student_service: StudentService) -> Course | None:
             if retry != "1":
                 return None
             continue
-        _print_courses(results)
+        _print_courses(results, show_capacity=False)
         print(f"총 {len(results)}건 검색됨.")
         while True:
             sel = input("선택 번호 입력 (0: 돌아가기) > ").strip()
@@ -189,18 +199,8 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             _print_courses(student_service.list_courses(), counts)
             input("엔터를 누르면 메뉴로 돌아갑니다. >")
         elif choice == "2":
-            while True:
-                keyword = input("과목명 검색어 > ").strip()
-                results = student_service.search_courses(keyword)
-                if not results:
-                    print("검색 결과가 없습니다.")
-                    retry = input("다시 검색하시겠습니까? (1: 재검색 / 0: 돌아가기) > ").strip()
-                    if retry != "1":
-                        break
-                else:
-                    _print_courses(results)
-                    print(f"총 {len(results)}건 검색됨.")
-                    break
+            # 기획서 6.7.2: 공용 검색 UI 재사용 (선택 결과는 단독 조회이므로 무시)
+            _search_and_select_course(student_service)
         elif choice == "3":
             print("===== 기이수 과목 목록 =====")
             completed_list = student_service.list_completed()
@@ -259,7 +259,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                 if not results:
                     print("검색 결과가 없습니다.")
                     continue
-                _print_courses(results)
+                _print_courses(results, show_capacity=False)
                 print(f"총 {len(results)}건 검색됨.")
                 pick = input("번호 선택 (0: 돌아가기) > ").strip()
                 if pick == "0":

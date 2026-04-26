@@ -12,7 +12,6 @@ from major_basics.modules.student_service import StudentService
 def _parse_date(value: str) -> date | None:
     try:
         parsed_date = date.fromisoformat(value)
-        # 5.2.5절 허용 범위 제한 로직 추가
         if not (date(2000, 1, 1) <= parsed_date <= date(2099, 12, 31)):
             return None
         return parsed_date
@@ -52,17 +51,16 @@ def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | N
         
         pick = input("번호 선택 > ").strip()
         
-        # 아무것도 입력 안 하면 재대기 
         if not pick:
             continue
             
         if not pick.isdigit() or int(pick) < 1 or int(pick) > len(college_list):
             # 6.3-13 요구 메시지
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
-            continue # 다시 목록 출력 및 입력 대기
+            continue 
         
         selected_college = college_list[int(pick) - 1]
-        break # 제대로 골랐으니 단과대 루프 탈출
+        break 
 
     # 2. 전공 선택 루프
     majors = colleges[selected_college]
@@ -82,7 +80,7 @@ def _choose_college_major(colleges: dict[str, list[str]]) -> tuple[str, str] | N
             continue # 다시 목록 출력 및 입력 대기
             
         selected_major = majors[int(mpick) - 1]
-        break # 전공까지 골랐으니 최종 탈출
+        break
 
     return selected_college, selected_major
 
@@ -343,7 +341,7 @@ def main() -> None:
         choice = input("선택 > ").strip()
 
         if choice == "1":
-            first = True  # ← while 루프 밖으로 꺼내기
+            first = True 
             while True:
                 while True:
                     prompt = "\n---------------------------------------- \nID(학번 또는 관리자ID) > " if first else "ID(학번 또는 관리자ID) > "
@@ -378,7 +376,7 @@ def main() -> None:
 
                 if not go_back:
                     break
-                
+
         elif choice == "2":
             print("\n===== 회원가입 =====")
             
@@ -396,19 +394,17 @@ def main() -> None:
                 is_valid, msg = auth_service.validate_password_format(password, user_type="student")
                 
                 if is_valid:
-                    # 형식이 맞으면 다음 단계(이름 입력)로 넘어갑니다.
                     break 
-                
-                # 형식이 틀렸을 때만 오류 메시지를 출력하고 다시 입력받습니다.
+
                 print(f"!!! 오류: {msg}")
 
-           # 3. 이름 입력 루프 (6.3-11, 12 대응)
+           # 3. 이름 입력 루프
             while True:
                 name = input("이름 (한국어 완성형) > ").strip()
                 
                 # 아무것도 입력하지 않았을 때 (공백 포함)
                 if not name:
-                    continue  # 메시지 없이 바로 다시 "이름: "이 뜹니다.
+                    continue
                 
                 # 한글 완성형 형식 검사
                 is_valid, msg = auth_service.validate_name(name)

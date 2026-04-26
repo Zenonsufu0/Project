@@ -1,5 +1,6 @@
 import re
 import sys
+import unicodedata
 from datetime import date
 from pathlib import Path
 
@@ -67,6 +68,13 @@ def _parse_hhmm(value: str) -> int | None:
         return None
 
 
+def _header_sep(header: str) -> str:
+    """헤더 문자열에서 열 구분선 생성. CJK 문자는 2열 너비로 계산."""
+    def _vis(s: str) -> int:
+        return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)
+    return "-+-".join("-" * _vis(col) for col in header.split(" | "))
+
+
 def _save_all(store: DataStore, students, admins, courses, enrollments, completed, config) -> None:
     store.save_students(students)
     store.save_admins(admins)
@@ -122,10 +130,12 @@ def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = 
         print("조회 결과가 없습니다.")
         return
     if show_capacity:
-        print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수 | 정원")
+        hdr = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수 | 정원"
     else:
         # 기획서 6.7.2: 과목 검색 결과는 정원 열 미표시
-        print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수")
+        hdr = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 요일 | 시간 | 담당교수"
+    print(hdr)
+    print(_header_sep(hdr))
     for i, course in enumerate(courses, 1):
         if show_capacity:
             now = current_counts[course.key()] if current_counts and course.key() in current_counts else 0
@@ -207,7 +217,9 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not completed_list:
                 print("등록된 기이수 과목이 없습니다.")
             else:
-                print("번호 | 과목코드 | 과목명")
+                hdr3 = "번호 | 과목코드 | 과목명"
+                print(hdr3)
+                print(_header_sep(hdr3))
                 for i, code in enumerate(completed_list, 1):
                     course_obj = next((c for c in courses.values() if c.code == code), None)
                     name_str = course_obj.name if course_obj else "(삭제된 강의)"
@@ -287,7 +299,9 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                 print("!!! 안내: 취소 가능한 과목이 없습니다.")
                 continue
             print("===== 수강취소 =====")
-            print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 재수강")
+            hdr6 = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 재수강"
+            print(hdr6)
+            print(_header_sep(hdr6))
             for i, course in enumerate(timetable, 1):
                 retake = "Y" if student_service.is_retake(course.code) else "N"
                 print(f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | {retake}")
@@ -313,7 +327,9 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not history:
                 print("신청 내역이 없습니다.")
             else:
-                print("번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 상태 | 재수강")
+                hdr7 = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 상태 | 재수강"
+                print(hdr7)
+                print(_header_sep(hdr7))
                 for i, enrollment in enumerate(history, 1):
                     course = courses.get(enrollment.key())
                     name = course.name if course else "(삭제된 강의)"
@@ -690,7 +706,9 @@ def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, stu
                 break
         elif choice == "8":
             print("===== 전체 수강 현황 =====")
-            print("과목코드 | 분반코드 | 과목명 | 정원 | 신청 인원")
+            hdr8 = "과목코드 | 분반코드 | 과목명 | 정원 | 신청 인원"
+            print(hdr8)
+            print(_header_sep(hdr8))
             for course, count in admin_service.enrollment_summary():
                 print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}")
             input("엔터를 누르면 메뉴로 돌아갑니다. >")

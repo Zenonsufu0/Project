@@ -79,6 +79,10 @@ class AdminService:
         return True, f"✓ 강의 수정 완료: {course.name} ({course.code}-{course.section})"
 
     def delete_course(self, code: str, section: str) -> tuple[bool, str]:
+        if not (code.isdigit() and len(code) == 4):
+            return False, "!!! 오류: 과목코드는 숫자 4자리여야 합니다."
+        if not (section.isdigit() and len(section) == 2):
+            return False, "!!! 오류: 분반코드는 숫자 2자리여야 합니다."
         key = (code, section)
         course = self.courses.get(key)
         if not course:
@@ -89,6 +93,10 @@ class AdminService:
         return True, f"✓ 강의 삭제 완료: {course.name} ({code}-{section}) → inactive 처리됨"
 
     def activate_course(self, code: str, section: str) -> tuple[bool, str]:
+        if not (code.isdigit() and len(code) == 4):
+            return False, "!!! 오류: 과목코드는 숫자 4자리여야 합니다."
+        if not (section.isdigit() and len(section) == 2):
+            return False, "!!! 오류: 분반코드는 숫자 2자리여야 합니다."
         key = (code, section)
         course = self.courses.get(key)
         if not course:
@@ -99,6 +107,10 @@ class AdminService:
         return True, f"✓ 강의 활성화 완료: {course.name} ({code}-{section})"
 
     def set_registration_period(self, start: date, end: date) -> tuple[bool, str]:
+        if not (date(2000, 1, 1) <= start <= date(2099, 12, 31)):
+            return False, "!!! 오류: 날짜는 2000-01-01 ~ 2099-12-31 범위여야 합니다."
+        if not (date(2000, 1, 1) <= end <= date(2099, 12, 31)):
+            return False, "!!! 오류: 날짜는 2000-01-01 ~ 2099-12-31 범위여야 합니다."
         if end < start:
             return False, "!!! 오류: 종료일은 시작일과 같거나 이후여야 합니다."
         self.config.reg_start = start

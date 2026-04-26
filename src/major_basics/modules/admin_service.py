@@ -65,7 +65,6 @@ class AdminService:
             return False, "이미 존재하는 개설 강의입니다."
 
         # 강의 등록 시 기본 상태는 active로 저장한다.
-        course.status = "active"
         self.courses[course.key()] = course
         return True, f"강의 등록 완료: {course.name} ({course.code}-{course.section})"
 

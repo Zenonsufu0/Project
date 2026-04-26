@@ -33,34 +33,39 @@ class StudentService:
     def list_completed(self) -> list[str]:
         return sorted(self.completed.get(self.student.student_id, set()))
 
-    def add_completed(self, course_code: str) -> tuple[bool, str]:
-        if not self._course_code_exists(course_code):
-            return False, "!!! 오류: 존재하지 않는 과목코드입니다."
+    # student_service.py
 
-        bucket = self.completed.setdefault(self.student.student_id, set())
-        if course_code in bucket:
-            return False, "!!! 오류: 이미 기이수 처리된 과목입니다."
+    def add_completed(self, course: Course) -> tuple[bool, str, bool]:
+        """
+        [6.8.2 기이수 과목 추가]
+        반환값: (성공여부, 메시지, 확인창필요여부)
+        """
+        # 1. 의미 규칙: 중복 추가 방지
+        completed_set = self.completed.get(self.student.student_id, set())
+        if course.code in completed_set:
+            # 기획서 요구 문구: !!! 오류: 이미 기이수 처리된 과목입니다.
+            return False, "!!! 오류: 이미 기이수 처리된 과목입니다.", False
 
-        bucket.add(course_code)
-        return True, "✓ 기이수 과목 등록 완료"
+        # 2. 추가 확인: 현재 수강신청 중(enrolled)인 경우 (self.timetable() 활용)
+        is_enrolled = any(c.code == course.code for c in self.timetable())
+        if is_enrolled:
+            # 기획서 요구 문구: 이 과목은 현재 수강신청 중입니다. 기이수로 추가하시겠습니까?
+            return True, "이 과목은 현재 수강신청 중입니다. 기이수로 추가하시겠습니까?", True
 
-    def is_currently_enrolled(self, course_code: str) -> bool:
-        """Return True if student has an active 'enrolled' status for this course code."""
-        return any(code == course_code for code, _ in self._active_enrolled_map())
+        # 3. 정상 처리 (수강 중이 아닐 때 바로 추가)
+        self._save_to_completed_set(course.code)
+        return True, f"기이수 과목으로 추가되었습니다: [{course.name}]", False
 
-    def force_cancel_enrollment(self, course_code: str) -> None:
-        """Cancel enrollment without registration-period check (used for 기이수 processing)."""
-        for i, e in enumerate(self.enrollments):
-            if (
-                e.student_id == self.student.student_id
-                and e.course_code == course_code
-                and e.status == "enrolled"
-            ):
-                from major_basics.modules.models import Enrollment
-                self.enrollments[i] = Enrollment(
-                    e.student_id, e.course_code, e.section, "cancelled"
-                )
-                return
+    def confirm_add_completed(self, course: Course) -> str:
+        """사용자가 확인창에서 '1(예)'을 선택했을 때 실행되는 최종 저장 로직"""
+        self._save_to_completed_set(course.code)
+        return f"기이수 과목으로 추가되었습니다: [{course.name}]"
+
+    def _save_to_completed_set(self, course_code: str):
+        """내부 저장 보조 메서드"""
+        if self.student.student_id not in self.completed:
+            self.completed[self.student.student_id] = set()
+        self.completed[self.student.student_id].add(course_code)
 
     def is_retake(self, course_code: str) -> bool:
         return course_code in self.completed.get(self.student.student_id, set())
@@ -68,14 +73,7 @@ class StudentService:
     def register(self, course_code: str, section: str) -> tuple[bool, str, bool]:
         """Returns (ok, message, is_retake). Checks follow 기획서 6.9 순서."""
         if not self.is_registration_open():
-<<<<<<< HEAD
-            return False, "!!! 안내: 현재 수강신청 기간이 아닙니다."
-
-        if not any(course.code == course_code for course in self.courses.values()):
-            return False, "!!! 오류: 존재하지 않는 과목코드입니다."
-=======
             return False, "!!! 안내: 현재 수강신청 기간이 아닙니다.", False
->>>>>>> claude/mystifying-hoover-15d360
 
         # 1단계 — 과목 존재 여부 확인
         if not self._course_code_exists(course_code):
@@ -84,19 +82,6 @@ class StudentService:
         # 2단계 — 분반 존재 여부 확인
         key = (course_code, section)
         course = self.courses.get(key)
-<<<<<<< HEAD
-        if course is None:
-            return False, "!!! 오류: 존재하지 않는 분반입니다."
-
-        if course.status != "active":
-            return False, "!!! 오류: 현재 신청 불가능한(inactive) 과목입니다."
-
-        active = self._active_enrolled_map()
-
-        for enrolled_key in active.keys():
-            if enrolled_key[0] == course_code:
-                return False, "!!! 오류: 이미 신청한 과목입니다."
-=======
         if not course:
             return False, "!!! 오류: 존재하지 않는 분반입니다.", False
 
@@ -111,28 +96,14 @@ class StudentService:
         for (c, _s) in active_map.keys():
             if c == course_code:
                 return False, "!!! 오류: 이미 신청한 과목입니다.", False
->>>>>>> claude/mystifying-hoover-15d360
 
         # 5단계 — 정원 초과 확인
         if self._count_course_enrolled(key) >= course.capacity:
-<<<<<<< HEAD
-            return False, "!!! 오류: 해당 과목의 정원이 마감되었습니다."
-=======
             return False, "!!! 오류: 해당 과목의 정원이 마감되었습니다.", False
->>>>>>> claude/mystifying-hoover-15d360
 
         # 6단계 — 시간표 충돌 확인
         conflict = self._find_time_conflict(course)
         if conflict is not None:
-<<<<<<< HEAD
-            return False, (
-                f"!!! 오류: 시간표 충돌 - {conflict.name} "
-                f"({conflict.day} {conflict.time_text()})과 겹칩니다."
-            )
-
-        if self.current_credits() + course.credits > self.MAX_CREDITS:
-            return False, "!!! 오류: 최대 신청 학점(18)을 초과합니다."
-=======
             return (
                 False,
                 f"!!! 오류: 시간표 충돌 - {conflict.name} ({conflict.day} {conflict.time_text()})과 겹칩니다.",
@@ -142,23 +113,16 @@ class StudentService:
         # 7단계 — 최대 학점 확인
         if self.current_credits() + course.credits > self.MAX_CREDITS:
             return False, f"!!! 오류: 최대 신청 학점({self.MAX_CREDITS})을 초과합니다.", False
->>>>>>> claude/mystifying-hoover-15d360
 
         self.enrollments.append(
             Enrollment(self.student.student_id, course_code, section, "enrolled")
         )
 
-<<<<<<< HEAD
-        if is_retake:
-            return True, "수강신청 완료 (안내: 재수강 과목입니다)"
-        return True, "수강신청 완료"
-=======
         retake = self.is_retake(course_code)
         message = f"✓ 수강신청 완료: {course.name}"
         if retake:
             message += "\n안내: 재수강 과목입니다."
         return True, message, retake
->>>>>>> claude/mystifying-hoover-15d360
 
     def cancel(self, course_code: str, section: str) -> tuple[bool, str]:
         if not self.is_registration_open():
@@ -178,13 +142,7 @@ class StudentService:
         return True, f"✓ 수강취소 완료: {name}"
 
     def enrollment_history(self) -> list[Enrollment]:
-        """과목(코드+분반)별 최신 상태 한 건씩만 반환한다."""
-        latest: dict[tuple[str, str], Enrollment] = {}
-        for enrollment in self.enrollments:
-            if enrollment.student_id != self.student.student_id:
-                continue
-            latest[enrollment.key()] = enrollment
-        return sorted(latest.values(), key=lambda e: (e.course_code, e.section))
+        return [enrollment for enrollment in self.enrollments if enrollment.student_id == self.student.student_id]
 
     def timetable(self) -> list[Course]:
         active = self._active_enrolled_map()

@@ -1,4 +1,4 @@
-﻿import getpass
+import getpass
 from datetime import date
 from pathlib import Path
 

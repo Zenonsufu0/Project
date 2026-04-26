@@ -1,3 +1,4 @@
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -6,6 +7,35 @@ from major_basics.modules.auth import AuthService
 from major_basics.modules.models import Course, Student
 from major_basics.modules.storage import DataStore
 from major_basics.modules.student_service import StudentService
+
+
+def _input_password(prompt: str = "비밀번호 > ") -> str:
+    """비밀번호 입력 시 * 마스킹. Windows: msvcrt, 그 외: getpass 사용."""
+    print(prompt, end="", flush=True)
+    if sys.platform == "win32":
+        import msvcrt
+        chars = []
+        while True:
+            ch = msvcrt.getwch()
+            if ch in ("\r", "\n"):      # Enter
+                print()
+                break
+            elif ch == "\x03":          # Ctrl+C
+                print()
+                raise KeyboardInterrupt
+            elif ch in ("\x08", "\x7f"):  # Backspace
+                if chars:
+                    chars.pop()
+                    print("\b \b", end="", flush=True)
+            elif ch == "\x00" or ch == "\xe0":  # 특수키 (방향키 등) 무시
+                msvcrt.getwch()
+            else:
+                chars.append(ch)
+                print("*", end="", flush=True)
+        return "".join(chars)
+    else:
+        import getpass
+        return getpass.getpass("")
 
 
 def _parse_date(value: str) -> date | None:
@@ -397,7 +427,7 @@ def main() -> None:
         if choice == "1":
             print("----------------------------------------")
             user_id = input("ID (학번 또는 관리자 ID) > ").strip()
-            password = input("비밀번호 > ").strip()
+            password = _input_password("비밀번호 > ")
             role, user, msg = auth_service.login(user_id, password)
             print(msg)
 

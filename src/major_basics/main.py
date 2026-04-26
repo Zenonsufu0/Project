@@ -222,10 +222,27 @@ def _input_course() -> Course | None:
         print("시각 형식이 올바르지 않습니다. 예: 09:00")
         return None
 
+    if start % 30 != 0 or end % 30 != 0:
+        print("시작 시각과 종료 시각의 분 값은 00 또는 30만 허용합니다.")
+        return None
+
     return Course(code, section, name, int(credits_s), professor, day, start, end, status, int(capacity_s))
 
 
-def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
+def _admin_menu(
+    admin_service: AdminService,
+    admin_id: str,
+    store: DataStore,
+    students,
+    admins,
+    courses,
+    enrollments,
+    completed,
+    config,
+) -> None:
+    def save_now() -> None:
+        _save_all(store, students, admins, courses, enrollments, completed, config)
+
     while True:
         _admin_header(admin_id, admin_service.config)
 
@@ -247,73 +264,126 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
             pw = input("비밀번호: ").strip()
             name = input("이름: ").strip()
             selected = _choose_college_major(admin_service.colleges)
+
             if selected is None:
                 continue
+
             college, major = selected
-            _, msg = admin_service.register_student(Student(sid, pw, name, college, major, "active"))
+            ok, msg = admin_service.register_student(Student(sid, pw, name, college, major, "active"))
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "2":
             print("===== 학생 삭제 ===== ")
             sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+
             if sid == "0":
                 continue
-            _, msg = admin_service.delete_student(sid)
+
+            ok, msg = admin_service.delete_student(sid)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "3":
             print("===== 학생 활성화 =====")
             sid = input("활성화할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+
             if sid == "0":
                 continue
-            _, msg = admin_service.activate_student(sid)
+
+            ok, msg = admin_service.activate_student(sid)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "4":
             print("===== 강의 등록 =====")
             course = _input_course()
+
             if course is None:
                 continue
-            _, msg = admin_service.add_course(course)
+
+            ok, msg = admin_service.add_course(course)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "5":
             print("===== 강의 수정 =====")
             course = _input_course()
+
             if course is None:
                 continue
-            _, msg = admin_service.update_course(course)
+
+            ok, msg = admin_service.update_course(course)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "6":
             print("===== 강의 삭제 =====")
             code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
+
             if code == "0":
                 continue
+
             section = input("삭제할 분반코드 입력 > ").strip()
-            _, msg = admin_service.delete_course(code, section)
+            ok, msg = admin_service.delete_course(code, section)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "7":
             print("===== 강의 활성화 =====")
             code = input("활성화할 과목코드 입력 (0: 돌아가기) > ").strip()
+
             if code == "0":
                 continue
+
             section = input("활성화할 분반코드 입력 > ").strip()
-            _, msg = admin_service.activate_course(code, section)
+            ok, msg = admin_service.activate_course(code, section)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "8":
-            print("===== 전체 수강 현황 =====\n과목코드 | 분반 | 과목명 | 정원 | 신청인원")
+            print("===== 전체 수강 현황 =====")
+            print("과목코드 | 분반 | 과목명 | 정원 | 신청인원")
+
             for course, count in admin_service.enrollment_summary():
                 print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}")
+
         elif choice == "9":
             print("===== 수강신청 기간 설정 =====")
             start_s = input("수강신청 시작일(YYYY-MM-DD): ").strip()
             end_s = input("수강신청 종료일(YYYY-MM-DD): ").strip()
+
             start = _parse_date(start_s)
             end = _parse_date(end_s)
+
             if start is None or end is None:
                 print("날짜 형식이 올바르지 않습니다.")
                 continue
-            _, msg = admin_service.set_registration_period(start, end)
+
+            ok, msg = admin_service.set_registration_period(start, end)
             print(msg)
+
+            if ok:
+                save_now()
+
         elif choice == "0":
             print("로그아웃합니다.")
             break
+
         else:
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
@@ -376,7 +446,17 @@ def main() -> None:
                     elif role == "admin":
                         print(msg)
                         admin_service = AdminService(students, courses, enrollments, completed, colleges, config)
-                        _admin_menu(admin_service, user_id)
+                        _admin_menu(
+                            admin_service,
+                            user_id,
+                            store,
+                            students,
+                            admins,
+                            courses,
+                            enrollments,
+                            completed,
+                            config,
+                        )
                         _save_all(store, students, admins, courses, enrollments, completed, config)
                         break
                     else:

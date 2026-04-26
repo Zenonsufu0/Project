@@ -319,7 +319,7 @@ def main() -> None:
         current_date = _parse_date(entered)
         if current_date is not None:
             break
-        print("날짜 형식이 올바르지 않습니다.")
+        print("!!! 오류: 날짜 형식이 올바르지 않습니다.")
 
     store = DataStore(data_dir)
     store.ensure_defaults(current_date)

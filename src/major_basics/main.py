@@ -39,9 +39,12 @@ def _input_password(prompt: str = "비밀번호 > ") -> str:
 
 
 def _parse_date(value: str) -> date | None:
-    """기획서 6.1: 현행 그레고리력에 존재하는 날짜."""
+    """기획서 6.1: 현행 그레고리력에 존재하는 날짜. 연도는 2000-2099 범위."""
     try:
-        return date.fromisoformat(value)
+        d = date.fromisoformat(value)
+        if not (2000 <= d.year <= 2099):
+            return None
+        return d
     except ValueError:
         return None
 

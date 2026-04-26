@@ -152,7 +152,7 @@ def _search_and_select_course(student_service: StudentService) -> Course | None:
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
-def _student_menu(student_service: StudentService, courses: dict, enrollments: list, config) -> None:
+def _student_menu(student_service: StudentService, courses: dict, enrollments: list, config, store, students, admins, completed) -> None:
     while True:
         print("\n----------------------------------------")
         print(f"[학생 메뉴] {student_service.student.name} ({student_service.student.student_id})")
@@ -231,6 +231,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             ok, msg = student_service.add_completed(code)
             if ok:
                 print(f"기이수 과목으로 추가되었습니다: {course.name}")
+                _save_all(store, students, admins, courses, enrollments, completed, config)
             else:
                 print(msg)
         elif choice == "5":
@@ -276,6 +277,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             _, msg, _ = student_service.register(selected.code, selected.section)
             print(msg)
             print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            _save_all(store, students, admins, courses, enrollments, completed, config)
         elif choice == "6":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
@@ -303,6 +305,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                 _, msg = student_service.cancel(selected.code, selected.section)
                 print(msg)
                 print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+                _save_all(store, students, admins, courses, enrollments, completed, config)
                 break
         elif choice == "7":
             print("===== 신청 내역 조회 =====")
@@ -689,7 +692,7 @@ def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, stu
             print("===== 전체 수강 현황 =====")
             print("과목코드 | 분반코드 | 과목명 | 정원 | 신청 인원")
             for course, count in admin_service.enrollment_summary():
-                print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}명")
+                print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}")
             input("엔터를 누르면 메뉴로 돌아갑니다. >")
         elif choice == "9":
             print("===== 수강신청 기간 설정 =====")
@@ -786,7 +789,7 @@ def main() -> None:
 
             if role == "student":
                 student_service = StudentService(user, courses, enrollments, completed, config)
-                _student_menu(student_service, courses, enrollments, config)
+                _student_menu(student_service, courses, enrollments, config, store, students, admins, completed)
                 _save_all(store, students, admins, courses, enrollments, completed, config)
             elif role == "admin":
                 admin_service = AdminService(students, courses, enrollments, completed, colleges, config)

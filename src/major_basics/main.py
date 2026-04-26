@@ -126,6 +126,28 @@ def _print_courses(courses, current_counts: dict[tuple[str, str], int] | None = 
         )
 
 
+def _search_and_select_course(student_service: StudentService) -> Course | None:
+    """기획서 6.4.2: 과목명 검색 → 번호 선택 → Course 반환 (0: 돌아가기 → None)."""
+    while True:
+        keyword = input("과목명 검색어 > ").strip()
+        results = student_service.search_courses(keyword)
+        if not results:
+            print("검색 결과가 없습니다.")
+            retry = input("다시 검색하시겠습니까? (1: 재검색 / 0: 돌아가기) > ").strip()
+            if retry != "1":
+                return None
+            continue
+        _print_courses(results)
+        print(f"총 {len(results)}건 검색됨.")
+        while True:
+            sel = input("선택 번호 입력 (0: 돌아가기) > ").strip()
+            if sel == "0":
+                return None
+            if sel.isdigit() and 1 <= int(sel) <= len(results):
+                return results[int(sel) - 1]
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+
+
 def _student_menu(student_service: StudentService, courses: dict, enrollments: list, config) -> None:
     while True:
         print("\n----------------------------------------")
@@ -180,18 +202,24 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     print(f"{i} | {code}")
                 print(f"총 {len(completed)}개 과목 이수 완료.")
         elif choice == "4":
-            code = input("기이수 추가 과목코드 > ").strip()
+            course = _search_and_select_course(student_service)
+            if course is None:
+                continue
+            code = course.code
             if student_service.is_currently_enrolled(code):
                 confirm = input(
-                    "수강신청 중입니다. 기이수 처리하시겠습니까? (1: 예 / 0: 아니오) > "
+                    "이 과목은 현재 수강신청 중입니다. 기이수로 추가하시겠습니까? (1: 예 / 0: 아니오) > "
                 ).strip()
                 if confirm != "1":
                     print("기이수 처리가 취소되었습니다.")
                     continue
                 student_service.force_cancel_enrollment(code)
                 print("수강신청이 취소 처리되었습니다.")
-            _, msg = student_service.add_completed(code)
-            print(msg)
+            ok, msg = student_service.add_completed(code)
+            if ok:
+                print(f"기이수 과목으로 추가되었습니다: {course.name}")
+            else:
+                print(msg)
         elif choice == "5":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")

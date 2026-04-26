@@ -90,7 +90,7 @@ class AdminService:
         if course.status == "inactive":
             return False, "!!! 안내: 이미 inactive 상태의 강의입니다."
         course.status = "inactive"
-        return True, f"✓ 강의 삭제 완료: {course.name} ({code}-{section})"
+        return True, f"✓ 강의 삭제 완료: {course.name} ({code}-{section}) → inactive 처리됨"
 
     def activate_course(self, code: str, section: str) -> tuple[bool, str]:
         if not (code.isdigit() and len(code) == 4):

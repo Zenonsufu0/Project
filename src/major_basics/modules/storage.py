@@ -163,11 +163,11 @@ class DataStore:
 
     def load_colleges(self) -> dict[str, list[str]]:
         colleges: dict[str, list[str]] = {}
-        for row in self._rows(self.colleges_path):
+        for line_no, row in self._enumerated_rows(self.colleges_path):
             if len(row) != 2:
-                # 의도된 동작: 5.5절 무결성 검사에서 형식 오류를 이미 검출·종료하므로
-                # 런타임 로드 시에는 비정상 행을 조용히 건너뛴다.
-                continue
+                raise IntegrityError(
+                    f"colleges.txt {line_no}행 - 문법 형식이 올바르지 않습니다: '필드 수 오류'"
+                )
             college = row[0]
             major = row[1]
             bucket = colleges.setdefault(college, [])

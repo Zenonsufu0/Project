@@ -13,6 +13,7 @@ class AdminService:
         colleges: dict[str, list[str]],
         config: Config,
     ) -> None:
+        # storage/main에서 불러온 원본 데이터를 참조하여 직접 수정한다.
         self.students = students
         self.courses = courses
         self.enrollments = enrollments
@@ -27,6 +28,7 @@ class AdminService:
         if student.college not in self.colleges or student.major not in self.colleges[student.college]:
             return False, "단과대학/전공 정보가 올바르지 않습니다."
 
+        # 관리자 등록 학생은 기본적으로 active 상태로 추가한다.
         student.status = "active"
         self.students[student.student_id] = student
         return True, f"학생 등록 완료: {student.name} ({student.student_id})"
@@ -38,6 +40,7 @@ class AdminService:
         if self.students[student_id].status == "inactive":
             return False, "이미 inactive 상태의 학생입니다."
 
+        # 학생 삭제는 실제 삭제가 아니라 inactive 처리한다.
         self.students[student_id].status = "inactive"
         return True, f"학생 삭제 완료: {student_id}"
 
@@ -61,11 +64,13 @@ class AdminService:
         if course.key() in self.courses:
             return False, "이미 존재하는 개설 강의입니다."
 
+        # 강의 등록 시 기본 상태는 active로 저장한다.
         course.status = "active"
         self.courses[course.key()] = course
         return True, f"강의 등록 완료: {course.name} ({course.code}-{course.section})"
 
     def update_course(self, course: Course) -> tuple[bool, str]:
+        # 수강신청 시작일 이후에는 강의 수정이 불가능하다.
         if self.config.current_date >= self.config.reg_start:
             return False, "수강신청 기간 중에는 강의를 수정할 수 없습니다."
 
@@ -97,6 +102,7 @@ class AdminService:
         if self.courses[key].status == "inactive":
             return False, "이미 inactive 상태의 강의입니다."
 
+        # 강의 삭제도 실제 삭제가 아니라 inactive 처리한다.
         self.courses[key].status = "inactive"
         return True, f"강의 삭제 완료: {self.courses[key].name} ({code}-{section}) → inactive 처리됨"
 
@@ -136,17 +142,20 @@ class AdminService:
     def enrollment_summary(self) -> list[tuple[Course, int]]:
         latest: dict[tuple[str, tuple[str, str]], str] = {}
 
+        # 같은 학생이 같은 강의에 대해 여러 기록을 가진 경우 마지막 상태만 사용한다.
         for enrollment in self.enrollments:
             latest[(enrollment.student_id, enrollment.key())] = enrollment.status
 
         counts: dict[tuple[str, str], int] = {}
 
+        # 전체 수강 현황은 enrolled 상태만 신청 인원으로 집계한다.
         for (_, key), status in latest.items():
             if status == "enrolled":
                 counts[key] = counts.get(key, 0) + 1
 
         result: list[tuple[Course, int]] = []
 
+        # 관리자 조회이므로 active/inactive와 관계없이 모든 강의를 출력 대상으로 반환한다.
         for key in sorted(self.courses.keys()):
             result.append((self.courses[key], counts.get(key, 0)))
 
@@ -154,6 +163,7 @@ class AdminService:
 
     @staticmethod
     def _validate_course_fields(course: Course) -> tuple[bool, str]:
+        # 강의 등록/수정에서 공통으로 사용하는 강의 필드 검증이다.
         if not (len(course.code) == 4 and all("0" <= ch <= "9" for ch in course.code)):
             return False, "과목코드는 숫자 4자리여야 합니다."
 

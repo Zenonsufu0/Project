@@ -157,13 +157,18 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     counts[key] = counts.get(key, 0) + 1
             _print_courses(student_service.list_courses(), counts)
         elif choice == "2":
-            keyword = input("과목명 검색어 > ").strip()
-            results = student_service.search_courses(keyword)
-            if not results:
-                print("검색 결과가 없습니다.")
-            else:
-                _print_courses(results)
-                print(f"총 {len(results)}건 검색됨.")
+            while True:
+                keyword = input("과목명 검색어 > ").strip()
+                results = student_service.search_courses(keyword)
+                if not results:
+                    print("검색 결과가 없습니다.")
+                    retry = input("다시 검색하시겠습니까? (1: 재검색 / 0: 돌아가기) > ").strip()
+                    if retry != "1":
+                        break
+                else:
+                    _print_courses(results)
+                    print(f"총 {len(results)}건 검색됨.")
+                    break
         elif choice == "3":
             print("===== 기이수 과목 목록 =====")
             completed = student_service.list_completed()
@@ -191,14 +196,29 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
-            if not student_service.timetable():
+            timetable = student_service.timetable()
+            if not timetable:
                 print("!!! 안내: 취소 가능한 과목이 없습니다.")
                 continue
-            code = input("취소 과목코드(4자리) > ").strip()
-            section = input("분반코드(2자리) > ").strip()
-            _, msg = student_service.cancel(code, section)
-            print(msg)
-            print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            print("===== 수강 취소 =====")
+            for i, course in enumerate(timetable, 1):
+                print(f"{i}. {course.code}-{course.section} {course.name}")
+            while True:
+                num_str = input("취소할 과목 번호 (0: 돌아가기) > ").strip()
+                if num_str == "0":
+                    break
+                if not num_str.isdigit() or int(num_str) < 1 or int(num_str) > len(timetable):
+                    print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+                    continue
+                selected = timetable[int(num_str) - 1]
+                confirm = input(f"{selected.name}을(를) 취소하시겠습니까? (1: 확인 / 0: 취소) > ").strip()
+                if confirm != "1":
+                    print("취소가 중단되었습니다.")
+                    break
+                _, msg = student_service.cancel(selected.code, selected.section)
+                print(msg)
+                print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+                break
         elif choice == "7":
             history = student_service.enrollment_history()
             if not history:

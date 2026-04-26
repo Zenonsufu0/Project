@@ -1,4 +1,4 @@
-﻿"""Root entry point.
+"""Root entry point.
 
 Allows running the project with: python main.py
 """

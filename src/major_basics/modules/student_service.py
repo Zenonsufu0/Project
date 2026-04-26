@@ -46,25 +46,37 @@ class StudentService:
 
     def register(self, course_code: str, section: str) -> tuple[bool, str]:
         if not self.is_registration_open():
-            return False, "수강신청 기간이 아닙니다."
+            return False, "!!! 안내: 현재 수강신청 기간이 아닙니다."
+
+        if not any(course.code == course_code for course in self.courses.values()):
+            return False, "!!! 오류: 존재하지 않는 과목코드입니다."
 
         key = (course_code, section)
         course = self.courses.get(key)
-        if not course or course.status != "active":
-            return False, "신청 가능한 강의가 아닙니다."
+        if course is None:
+            return False, "!!! 오류: 존재하지 않는 분반입니다."
 
-        if key in self._active_enrolled_map():
-            return False, "이미 신청한 강의입니다."
+        if course.status != "active":
+            return False, "!!! 오류: 현재 신청 불가능한(inactive) 과목입니다."
 
-        if self.current_credits() + course.credits > self.MAX_CREDITS:
-            return False, "최대 신청 학점(18학점)을 초과합니다."
+        active = self._active_enrolled_map()
+
+        for enrolled_key in active.keys():
+            if enrolled_key[0] == course_code:
+                return False, "!!! 오류: 이미 신청한 과목입니다."
 
         if self._count_course_enrolled(key) >= course.capacity:
-            return False, "정원이 가득 찼습니다."
+            return False, "!!! 오류: 해당 과목의 정원이 마감되었습니다."
 
         conflict = self._find_time_conflict(course)
         if conflict is not None:
-            return False, f"시간표 충돌: {conflict.code}-{conflict.section} {conflict.time_text()}"
+            return False, (
+                f"!!! 오류: 시간표 충돌 - {conflict.name} "
+                f"({conflict.day} {conflict.time_text()})과 겹칩니다."
+            )
+
+        if self.current_credits() + course.credits > self.MAX_CREDITS:
+            return False, "!!! 오류: 최대 신청 학점(18)을 초과합니다."
 
         is_retake = course_code in self.completed.get(self.student.student_id, set())
         self.enrollments.append(
@@ -72,7 +84,7 @@ class StudentService:
         )
 
         if is_retake:
-            return True, "수강신청 완료 (재수강 Y)"
+            return True, "수강신청 완료 (안내: 재수강 과목입니다)"
         return True, "수강신청 완료"
 
     def cancel(self, course_code: str, section: str) -> tuple[bool, str]:

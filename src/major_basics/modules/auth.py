@@ -55,6 +55,17 @@ class AuthService:
         self.students[student.student_id] = student
         return True, "회원가입 완료", student
 
+    def check_user_id(self, user_id: str) -> tuple[bool, str]:
+        """기획서 6.4: ID 존재·활성 여부만 확인 (비밀번호 미검증)."""
+        student = self.students.get(user_id)
+        if student:
+            if student.status != "active":
+                return False, "!!! 오류: 비활성화된 계정입니다."
+            return True, ""
+        if user_id in self.admins:
+            return True, ""
+        return False, "!!! 오류: 존재하지 않는 계정입니다."
+
     def login(self, user_id: str, password: str) -> tuple[str, object | None, str]:
         student = self.students.get(user_id)
         if student:

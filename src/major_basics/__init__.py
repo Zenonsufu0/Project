@@ -1,0 +1,1 @@
+﻿"""Major basics project package."""

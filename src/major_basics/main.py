@@ -191,6 +191,9 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
+            if not student_service.timetable():
+                print("!!! 안내: 취소 가능한 과목이 없습니다.")
+                continue
             code = input("취소 과목코드(4자리) > ").strip()
             section = input("분반코드(2자리) > ").strip()
             _, msg = student_service.cancel(code, section)

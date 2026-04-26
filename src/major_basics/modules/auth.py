@@ -17,7 +17,7 @@ class AuthService:
     # [추가] 실시간 학번 검사
     def validate_student_id(self, student_id: str) -> tuple[bool, str]:
         if not student_id.isdigit() or len(student_id) != 9:
-            return False, "학번은 숫자 9자리여야 합니다."
+            return False, "학번은 숫자 9자리이어야 합니다."
         if student_id in self.students or student_id in self.admins:
             return False, "이미 존재하는 학번입니다."
         return True, "사용 가능한 학번입니다."

@@ -255,11 +255,15 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
         elif choice == "2":
             print("===== 학생 삭제 ===== ")
             sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+            if sid == "0":
+                continue
             _, msg = admin_service.delete_student(sid)
             print(msg)
         elif choice == "3":
             print("===== 학생 활성화 =====")
             sid = input("활성화할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+            if sid == "0":
+                continue
             _, msg = admin_service.activate_student(sid)
             print(msg)
         elif choice == "4":
@@ -279,12 +283,16 @@ def _admin_menu(admin_service: AdminService, admin_id: str) -> None:
         elif choice == "6":
             print("===== 강의 삭제 =====")
             code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
+            if code == "0":
+                continue
             section = input("삭제할 분반코드 입력 > ").strip()
             _, msg = admin_service.delete_course(code, section)
             print(msg)
         elif choice == "7":
             print("===== 강의 활성화 =====")
             code = input("활성화할 과목코드 입력 (0: 돌아가기) > ").strip()
+            if code == "0":
+                continue
             section = input("활성화할 분반코드 입력 > ").strip()
             _, msg = admin_service.activate_course(code, section)
             print(msg)

@@ -545,8 +545,8 @@ def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, stu
                     break
                 # 중복 강의인 경우 과목코드 입력부터 재시작
         elif choice == "5":
-            if config.reg_start <= config.current_date <= config.reg_end:
-                print("!!! 오류: 수강신청 기간 중에는 강의를 수정할 수 없습니다.")
+            if config.current_date >= config.reg_start:
+                print("!!! 오류: 수강신청 기간 시작 이후에는 강의를 수정할 수 없습니다.")
                 continue
             print("===== 강의 수정 =====")
             _update_found = False

@@ -28,6 +28,8 @@ class StudentService:
             course
             for course in self.list_courses()
             if key in course.name.lower()
+            or key in course.code.lower()
+            or key in course.section.lower()
         ]
 
     def list_completed(self) -> list[str]:

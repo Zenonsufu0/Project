@@ -137,7 +137,13 @@ class StudentService:
         return True, f"✓ 수강취소 완료: {name}"
 
     def enrollment_history(self) -> list[Enrollment]:
-        return [enrollment for enrollment in self.enrollments if enrollment.student_id == self.student.student_id]
+        """과목(코드+분반)별 최신 상태 한 건씩만 반환한다."""
+        latest: dict[tuple[str, str], Enrollment] = {}
+        for enrollment in self.enrollments:
+            if enrollment.student_id != self.student.student_id:
+                continue
+            latest[enrollment.key()] = enrollment
+        return sorted(latest.values(), key=lambda e: (e.course_code, e.section))
 
     def timetable(self) -> list[Course]:
         active = self._active_enrolled_map()

@@ -118,7 +118,7 @@ class StudentService:
         retake = self.is_retake(course_code)
         message = f"✓ 수강신청 완료: {course.name}"
         if retake:
-            message += "\n안내: 재수강 과목입니다."
+            message += "\n(안내: 재수강 과목입니다)"
         return True, message, retake
 
     def cancel(self, course_code: str, section: str) -> tuple[bool, str]:

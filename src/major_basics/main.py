@@ -1,3 +1,4 @@
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -173,6 +174,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
         choice = input("선택 > ").strip()
 
         if choice == "1":
+            print("===== 개설 과목 목록 =====")
             counts = {}
             latest = {}
             for enrollment in enrollments:
@@ -196,14 +198,16 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     break
         elif choice == "3":
             print("===== 기이수 과목 목록 =====")
-            completed = student_service.list_completed()
-            if not completed:
+            completed_list = student_service.list_completed()
+            if not completed_list:
                 print("등록된 기이수 과목이 없습니다.")
             else:
-                print("번호 | 과목코드")
-                for i, code in enumerate(completed, 1):
-                    print(f"{i} | {code}")
-                print(f"총 {len(completed)}개 과목 이수 완료.")
+                print("번호 | 과목코드 | 과목명")
+                for i, code in enumerate(completed_list, 1):
+                    course_obj = next((c for c in courses.values() if c.code == code), None)
+                    name_str = course_obj.name if course_obj else "(삭제된 강의)"
+                    print(f"{i} | {code} | {name_str}")
+                print(f"총 {len(completed_list)}개 과목 이수 완료.")
         elif choice == "4":
             course = _search_and_select_course(student_service)
             if course is None:
@@ -228,25 +232,28 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
             print("===== 수강신청 =====")
-            raw = input("과목명 또는 과목코드와 분반코드 입력 (0: 돌아가기) > ").strip()
+            raw = input("과목명 또는 과목코드 입력 (0: 돌아가기) > ").strip()
             if raw == "0":
                 continue
-            parts = raw.split()
-            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-                code, section = parts
-                course = courses.get((code, section))
-                if course:
-                    print("\n[선택된 과목]")
-                    print(f"과목코드: {course.code} | 분반코드: {course.section} | "
-                          f"과목명: {course.name} | 학점: {course.credits} | "
-                          f"{course.day} {course.time_text()} | {course.professor}")
-                confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-                if confirm != "1":
+            # 4자리 숫자 → 과목코드 직접 조회
+            if raw.isdigit() and len(raw) == 4:
+                matches = [c for c in student_service.list_courses() if c.code == raw]
+                if not matches:
+                    print("검색 결과가 없습니다.")
                     continue
-                _, msg, _ = student_service.register(code, section)
-                print(msg)
-                print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+                if len(matches) == 1:
+                    selected = matches[0]
+                else:
+                    _print_courses(matches)
+                    pick = input("번호 선택 (0: 돌아가기) > ").strip()
+                    if pick == "0":
+                        continue
+                    if not pick.isdigit() or int(pick) < 1 or int(pick) > len(matches):
+                        print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+                        continue
+                    selected = matches[int(pick) - 1]
             else:
+                # 과목명 또는 과목코드+분반코드 검색
                 results = student_service.search_courses(raw)
                 if not results:
                     print("검색 결과가 없습니다.")
@@ -259,16 +266,16 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
                     continue
                 selected = results[int(pick) - 1]
-                print("\n[선택된 과목]")
-                print(f"과목코드: {selected.code} | 분반코드: {selected.section} | "
-                      f"과목명: {selected.name} | 학점: {selected.credits} | "
-                      f"{selected.day} {selected.time_text()} | {selected.professor}")
-                confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-                if confirm != "1":
-                    continue
-                _, msg, _ = student_service.register(selected.code, selected.section)
-                print(msg)
-                print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            print("\n[선택된 과목]")
+            print(f"과목코드: {selected.code} | 분반코드: {selected.section} | "
+                  f"과목명: {selected.name} | 학점: {selected.credits} | "
+                  f"{selected.day} {selected.time_text()} | {selected.professor}")
+            confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+            if confirm != "1":
+                continue
+            _, msg, _ = student_service.register(selected.code, selected.section)
+            print(msg)
+            print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
         elif choice == "6":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
@@ -277,9 +284,11 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not timetable:
                 print("!!! 안내: 취소 가능한 과목이 없습니다.")
                 continue
-            print("===== 수강 취소 =====")
+            print("===== 수강취소 =====")
+            print("번호 | 과목코드 | 과목명 | 학점 | 재수강")
             for i, course in enumerate(timetable, 1):
-                print(f"{i}. {course.code}-{course.section} {course.name}")
+                retake = "Y" if student_service.is_retake(course.code) else "N"
+                print(f"{i} | {course.code} | {course.name} | {course.credits} | {retake}")
             while True:
                 num_str = input("취소할 과목 번호 (0: 돌아가기) > ").strip()
                 if num_str == "0":
@@ -288,15 +297,15 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
                     continue
                 selected = timetable[int(num_str) - 1]
-                confirm = input(f"{selected.name}을(를) 취소하시겠습니까? (1: 확인 / 0: 취소) > ").strip()
+                confirm = input(f"수강취소하시겠습니까? {selected.name} (1: 예 / 0: 아니오) > ").strip()
                 if confirm != "1":
-                    print("취소가 중단되었습니다.")
                     break
                 _, msg = student_service.cancel(selected.code, selected.section)
                 print(msg)
                 print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
                 break
         elif choice == "7":
+            print("===== 신청 내역 조회 =====")
             history = student_service.enrollment_history()
             if not history:
                 print("신청 내역이 없습니다.")
@@ -328,7 +337,7 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                     for course in items:
                         name = course.name if len(course.name) <= 15 else course.name[:15] + "..."
                         print(
-                            f"[{day}] {course.time_text()} {name} ({course.code}-{course.section}) | "
+                            f"[{day}] {course.time_text()} {name} ({course.code}) | "
                             f"{course.credits}학점 | {course.professor}"
                         )
             print(f"총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
@@ -339,37 +348,75 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
-def _input_course() -> Course | None:
-    code = input("과목코드 (숫자 4자리) > ").strip()
-    section = input("분반코드 (숫자 2자리) > ").strip()
-    name = input("과목명 > ").strip()
-    credits_s = input("학점 (1~6 정수) > ").strip()
-    professor = input("담당교수 > ").strip()
-    day = input("요일 (MON/TUE/WED/THU/FRI) > ").strip().upper()
-    start_s = input("시작 시각 (HH:MM) > ").strip()
-    end_s = input("종료 시각 (HH:MM) > ").strip()
-    capacity_s = input("정원 (1 이상의 정수) > ").strip()
+def _input_course() -> Course:
+    """각 항목을 입력받고 즉시 검증. 오류 시 해당 항목만 재입력."""
+    while True:
+        code = input("과목코드 (숫자 4자리) > ").strip()
+        if code.isdigit() and len(code) == 4:
+            break
+        print("!!! 오류: 과목코드는 숫자 4자리여야 합니다.")
 
-    if not credits_s.isdigit() or not (1 <= int(credits_s) <= 6):
-        print("!!! 오류: 학점은 1~6 사이의 정수여야 합니다.")
-        return None
-    if not capacity_s.isdigit() or int(capacity_s) < 1:
+    while True:
+        section = input("분반코드 (숫자 2자리) > ").strip()
+        if section.isdigit() and len(section) == 2:
+            break
+        print("!!! 오류: 분반코드는 숫자 2자리여야 합니다.")
+
+    while True:
+        name = input("과목명 > ").strip()
+        if name and "\t" not in name and "\n" not in name:
+            break
+        print("!!! 오류: 과목명은 1자 이상이어야 하며 탭/개행을 포함할 수 없습니다.")
+
+    while True:
+        credits_s = input("학점 (1~6 정수) > ").strip()
+        if credits_s.isdigit() and 1 <= int(credits_s) <= 6:
+            break
+        print("!!! 오류: 학점은 1 이상 6 이하의 정수여야 합니다.")
+
+    while True:
+        professor = input("담당교수 > ").strip()
+        if professor and "\t" not in professor and "\n" not in professor:
+            break
+        print("!!! 오류: 담당교수는 1자 이상이어야 하며 탭/개행을 포함할 수 없습니다.")
+
+    while True:
+        day = input("요일 (MON/TUE/WED/THU/FRI) > ").strip().upper()
+        if day in ("MON", "TUE", "WED", "THU", "FRI"):
+            break
+        print("!!! 오류: 요일은 MON, TUE, WED, THU, FRI 중 하나여야 합니다.")
+
+    while True:
+        start_s = input("시작 시각 (HH:MM) > ").strip()
+        start = _parse_hhmm(start_s)
+        if start is not None:
+            break
+        print("!!! 오류: 시각 형식이 올바르지 않습니다. HH:MM, 분은 00 또는 30만 허용됩니다.")
+
+    while True:
+        end_s = input("종료 시각 (HH:MM) > ").strip()
+        end = _parse_hhmm(end_s)
+        if end is None:
+            print("!!! 오류: 시각 형식이 올바르지 않습니다. HH:MM, 분은 00 또는 30만 허용됩니다.")
+            continue
+        if end <= start:
+            print("!!! 오류: 종료 시각은 시작 시각보다 이후여야 합니다.")
+            continue
+        break
+
+    while True:
+        capacity_s = input("정원 (1 이상의 정수) > ").strip()
+        if capacity_s.isdigit() and int(capacity_s) >= 1:
+            break
         print("!!! 오류: 정원은 1 이상의 정수여야 합니다.")
-        return None
-
-    start = _parse_hhmm(start_s)
-    end = _parse_hhmm(end_s)
-    if start is None or end is None:
-        print("!!! 오류: 시각 형식이 올바르지 않습니다. 분은 00 또는 30만 허용됩니다.")
-        return None
 
     return Course(code, section, name, int(credits_s), professor, day, start, end, "active", int(capacity_s))
 
 
-def _admin_menu(admin_service: AdminService, colleges, store, students, admins, courses, enrollments, completed, config) -> None:
+def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, students, admins, courses, enrollments, completed, config) -> None:
     while True:
         print("\n----------------------------------------")
-        print(f"[관리자 메뉴] 관리자")
+        print(f"[관리자 메뉴] 관리자 ({admin_id})")
         print(
             f"오늘 날짜: {config.current_date.isoformat()} | "
             f"수강신청 기간: {config.reg_start.isoformat()} ~ {config.reg_end.isoformat()}"
@@ -389,9 +436,26 @@ def _admin_menu(admin_service: AdminService, colleges, store, students, admins, 
         choice = input("선택 > ").strip()
 
         if choice == "1":
-            sid = input("학번 (숫자 9자리) > ").strip()
-            pw = input("비밀번호 > ").strip()
-            name = input("이름 (한국어 완성형) > ").strip()
+            print("===== 학생 등록 =====")
+            while True:
+                sid = input("학번 (숫자 9자리) > ").strip()
+                if not (sid.isdigit() and len(sid) == 9):
+                    print("!!! 오류: 학번은 숫자 9자리이어야 합니다.")
+                    continue
+                if sid in students:
+                    print("!!! 오류: 이미 존재하는 학번입니다.")
+                    continue
+                break
+            while True:
+                pw = input("비밀번호 > ").strip()
+                if re.fullmatch(r"(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]{6,12}", pw):
+                    break
+                print("!!! 오류: 비밀번호는 영문자와 숫자를 각각 1자 이상 포함한 6~12자이어야 합니다.")
+            while True:
+                name = input("이름 (한국어 완성형) > ").strip()
+                if re.fullmatch(r"[가-힣]+", name):
+                    break
+                print("!!! 오류: 이름은 한국어 완성형 글자로만 이루어져야 합니다.")
             selected = _choose_college_major(colleges)
             if selected is None:
                 continue
@@ -403,6 +467,15 @@ def _admin_menu(admin_service: AdminService, colleges, store, students, admins, 
             print("===== 학생 삭제 =====")
             sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
             if sid == "0":
+                continue
+            target = students.get(sid)
+            if not target:
+                print("!!! 오류: 해당 학번의 학생이 없습니다.")
+                continue
+            print("[대상 학생 정보]")
+            print(f"학번: {target.student_id} | 이름: {target.name} | 단과대: {target.college} | 전공: {target.major} | 상태: {target.status}")
+            confirm = input("해당 학생을 정말 삭제하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+            if confirm != "1":
                 continue
             _, msg = admin_service.delete_student(sid)
             print(msg)
@@ -439,8 +512,36 @@ def _admin_menu(admin_service: AdminService, colleges, store, students, admins, 
             code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
             if code == "0":
                 continue
-            section = input("삭제할 분반코드 입력 > ").strip()
-            _, msg = admin_service.delete_course(code, section)
+            if not (code.isdigit() and len(code) == 4):
+                print("!!! 오류: 과목코드는 숫자 4자리여야 합니다.")
+                continue
+            matching = sorted([v for v in courses.values() if v.code == code], key=lambda c: c.section)
+            if not matching:
+                print("!!! 오류: 존재하지 않는 과목코드입니다.")
+                continue
+            if len(matching) == 1:
+                target_course = matching[0]
+            else:
+                for i, c in enumerate(matching, 1):
+                    print(f"{i}. 분반 {c.section} | {c.name} | {c.day} {c.time_text()} | 상태: {c.status}")
+                while True:
+                    pick = input("분반 선택 (0: 돌아가기) > ").strip()
+                    if pick == "0":
+                        break
+                    if pick.isdigit() and 1 <= int(pick) <= len(matching):
+                        target_course = matching[int(pick) - 1]
+                        break
+                    print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+                else:
+                    target_course = None
+                if pick == "0" or target_course is None:
+                    continue
+            print("[대상 강의 정보]")
+            print(f"과목코드: {target_course.code} | 과목명: {target_course.name} | 시간: {target_course.day} {target_course.time_text()}")
+            confirm = input("해당 강의를 정말 삭제하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+            if confirm != "1":
+                continue
+            _, msg = admin_service.delete_course(target_course.code, target_course.section)
             print(msg)
             _save_all(store, students, admins, courses, enrollments, completed, config)
         elif choice == "7":
@@ -456,7 +557,7 @@ def _admin_menu(admin_service: AdminService, colleges, store, students, admins, 
             print("===== 전체 수강 현황 =====")
             print("과목코드 | 분반코드 | 과목명 | 정원 | 신청 인원")
             for course, count in admin_service.enrollment_summary():
-                print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}")
+                print(f"{course.code} | {course.section} | {course.name} | {course.capacity} | {count}명")
         elif choice == "9":
             print("===== 수강신청 기간 설정 =====")
             print(f"현재 설정: {config.reg_start.isoformat()} ~ {config.reg_end.isoformat()}")
@@ -545,7 +646,6 @@ def main() -> None:
                         continue
                     break
                 break
-            print(msg)
 
             if role == "student":
                 student_service = StudentService(user, courses, enrollments, completed, config)
@@ -553,7 +653,7 @@ def main() -> None:
                 _save_all(store, students, admins, courses, enrollments, completed, config)
             elif role == "admin":
                 admin_service = AdminService(students, courses, enrollments, completed, colleges, config)
-                _admin_menu(admin_service, colleges, store, students, admins, courses, enrollments, completed, config)
+                _admin_menu(admin_service, user_id, colleges, store, students, admins, courses, enrollments, completed, config)
                 _save_all(store, students, admins, courses, enrollments, completed, config)
 
         elif choice == "2":

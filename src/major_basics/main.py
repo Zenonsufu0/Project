@@ -165,8 +165,12 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
         print("2. 과목 검색")
         print("3. 기이수 과목 조회")
         print("4. 기이수 과목 추가")
-        print("5. 수강신청")
-        print("6. 수강취소")
+        if student_service.is_registration_open():
+            print("5. 수강신청")
+            print("6. 수강취소")
+        else:
+            print("5. 수강신청 [기간 외]")
+            print("6. 수강취소 [기간 외]")
         print("7. 신청 내역 조회")
         print("8. 내 시간표 조회")
         print("0. 로그아웃")
@@ -464,69 +468,84 @@ def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, stu
             input("엔터를 누르면 메뉴로 돌아갑니다. >")
         elif choice == "2":
             print("===== 학생 삭제 =====")
-            sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
-            if sid == "0":
-                continue
-            target = students.get(sid)
-            if not target:
-                print("!!! 오류: 해당 학번의 학생이 없습니다.")
-                continue
-            print("[대상 학생 정보]")
-            print(f"학번: {target.student_id} | 이름: {target.name} | 단과대: {target.college} | 전공: {target.major} | 상태: {target.status}")
-            confirm = input("해당 학생을 삭제(비활성화)하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-            if confirm != "1":
-                print("!!! 안내: 학생 삭제가 취소되었습니다.")
-                continue
-            print("!!! 경고: 삭제된 학생은 inactive 상태로 전환됩니다.")
-            _, msg = admin_service.delete_student(sid)
-            print(msg)
-            _save_all(store, students, admins, courses, enrollments, completed, config)
-            input("엔터를 누르면 메뉴로 돌아갑니다. >")
+            while True:
+                sid = input("삭제할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+                if sid == "0":
+                    break
+                target = students.get(sid)
+                if not target:
+                    print("!!! 오류: 해당 학번의 학생이 없습니다.")
+                    continue
+                print("[대상 학생 정보]")
+                print(f"학번: {target.student_id} | 이름: {target.name} | 단과대: {target.college} | 전공: {target.major} | 상태: {target.status}")
+                if target.status == "inactive":
+                    print("!!! 안내: 이미 inactive 상태의 학생입니다.")
+                    break
+                confirm = input("해당 학생을 삭제(비활성화)하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    print("!!! 안내: 학생 삭제가 취소되었습니다.")
+                    break
+                print("!!! 경고: 삭제된 학생은 inactive 상태로 전환됩니다.")
+                _, msg = admin_service.delete_student(sid)
+                print(msg)
+                _save_all(store, students, admins, courses, enrollments, completed, config)
+                input("엔터를 누르면 메뉴로 돌아갑니다. >")
+                break
         elif choice == "3":
             print("===== 학생 활성화 =====")
-            sid = input("활성화할 학생의 학번 입력 (0: 돌아가기) > ").strip()
-            if sid == "0":
-                continue
-            target = students.get(sid)
-            if not target:
-                print("!!! 오류: 해당 학번의 학생이 없습니다.")
-                continue
-            print("[대상 학생 정보]")
-            print(f"학번: {target.student_id} | 이름: {target.name} | 단과대: {target.college} | 전공: {target.major} | 상태: {target.status}")
-            if target.status == "active":
-                print("!!! 안내: 이미 active 상태의 학생입니다.")
-                continue
-            confirm = input("해당 학생을 활성화하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-            if confirm != "1":
-                continue
-            _, msg = admin_service.activate_student(sid)
-            print(msg)
-            _save_all(store, students, admins, courses, enrollments, completed, config)
-            input("엔터를 누르면 메뉴로 돌아갑니다. >")
+            while True:
+                sid = input("활성화할 학생의 학번 입력 (0: 돌아가기) > ").strip()
+                if sid == "0":
+                    break
+                target = students.get(sid)
+                if not target:
+                    print("!!! 오류: 해당 학번의 학생이 없습니다.")
+                    continue
+                print("[대상 학생 정보]")
+                print(f"학번: {target.student_id} | 이름: {target.name} | 단과대: {target.college} | 전공: {target.major} | 상태: {target.status}")
+                if target.status == "active":
+                    print("!!! 안내: 이미 active 상태의 학생입니다.")
+                    break
+                confirm = input("해당 학생을 활성화하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    break
+                _, msg = admin_service.activate_student(sid)
+                print(msg)
+                _save_all(store, students, admins, courses, enrollments, completed, config)
+                input("엔터를 누르면 메뉴로 돌아갑니다. >")
+                break
         elif choice == "4":
             print("===== 강의 등록 =====")
-            course = _input_course()
-            if course is None:
-                continue
-            _, msg = admin_service.add_course(course)
-            print(msg)
-            _save_all(store, students, admins, courses, enrollments, completed, config)
-            input("엔터를 누르면 메뉴로 돌아갑니다. >")
+            while True:
+                course = _input_course()
+                ok, msg = admin_service.add_course(course)
+                print(msg)
+                if ok:
+                    _save_all(store, students, admins, courses, enrollments, completed, config)
+                    input("엔터를 누르면 메뉴로 돌아갑니다. >")
+                    break
+                # 중복 강의인 경우 과목코드 입력부터 재시작
         elif choice == "5":
             if config.reg_start <= config.current_date <= config.reg_end:
                 print("!!! 오류: 수강신청 기간 중에는 강의를 수정할 수 없습니다.")
                 continue
             print("===== 강의 수정 =====")
-            code = input("수정할 과목코드 입력 (0: 돌아가기) > ").strip()
-            if code == "0":
-                continue
-            section = input("수정할 분반코드 입력 > ").strip()
-            target_c = courses.get((code, section))
-            if not target_c:
-                print("!!! 오류: 존재하지 않는 개설 강의입니다.")
-                continue
-            if target_c.status == "inactive":
-                print("!!! 오류: inactive 상태의 강의는 수정할 수 없습니다. 먼저 강의를 활성화하세요.")
+            _update_found = False
+            while True:
+                code = input("수정할 과목코드 입력 (0: 돌아가기) > ").strip()
+                if code == "0":
+                    break
+                section = input("수정할 분반코드 입력 > ").strip()
+                target_c = courses.get((code, section))
+                if not target_c:
+                    print("!!! 오류: 존재하지 않는 개설 강의입니다.")
+                    continue
+                if target_c.status == "inactive":
+                    print("!!! 오류: inactive 상태의 강의는 수정할 수 없습니다. 먼저 강의를 활성화하세요.")
+                    break
+                _update_found = True
+                break
+            if not _update_found:
                 continue
             print("[대상 강의 정보]")
             print(f"과목코드: {target_c.code} | 분반코드: {target_c.section} | 과목명: {target_c.name} | "
@@ -613,52 +632,59 @@ def _admin_menu(admin_service: AdminService, admin_id: str, colleges, store, stu
             input("엔터를 누르면 메뉴로 돌아갑니다. >")
         elif choice == "6":
             print("===== 강의 삭제 =====")
-            code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
-            if code == "0":
-                continue
-            if not (code.isdigit() and len(code) == 4):
-                print("!!! 오류: 과목코드는 숫자 4자리여야 합니다.")
-                continue
-            section = input("삭제할 분반코드 입력 > ").strip()
-            target_course = courses.get((code, section))
-            if not target_course:
-                print("!!! 오류: 존재하지 않는 과목코드입니다.")
-                continue
-            print("[대상 강의 정보]")
-            print(f"과목코드: {target_course.code} | 분반코드: {target_course.section} | "
-                  f"과목명: {target_course.name} | 시간: {target_course.day} {target_course.time_text()} | 상태: {target_course.status}")
-            confirm = input("해당 강의를 삭제(비활성화)하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-            if confirm != "1":
-                print("!!! 안내: 강의 삭제가 취소되었습니다.")
-                continue
-            print("!!! 경고: 삭제된 강의는 inactive 상태로 전환됩니다.")
-            _, msg = admin_service.delete_course(target_course.code, target_course.section)
-            print(msg)
-            _save_all(store, students, admins, courses, enrollments, completed, config)
-            input("엔터를 누르면 메뉴로 돌아갑니다. >")
+            while True:
+                code = input("삭제할 과목코드 입력 (0: 돌아가기) > ").strip()
+                if code == "0":
+                    break
+                if not (code.isdigit() and len(code) == 4):
+                    print("!!! 오류: 과목코드는 숫자 4자리여야 합니다.")
+                    continue
+                section = input("삭제할 분반코드 입력 > ").strip()
+                target_course = courses.get((code, section))
+                if not target_course:
+                    print("!!! 오류: 존재하지 않는 과목코드입니다.")
+                    continue
+                print("[대상 강의 정보]")
+                print(f"과목코드: {target_course.code} | 분반코드: {target_course.section} | "
+                      f"과목명: {target_course.name} | 시간: {target_course.day} {target_course.time_text()} | 상태: {target_course.status}")
+                if target_course.status == "inactive":
+                    print("!!! 안내: 이미 inactive 상태의 강의입니다.")
+                    break
+                confirm = input("해당 강의를 삭제(비활성화)하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    print("!!! 안내: 강의 삭제가 취소되었습니다.")
+                    break
+                print("!!! 경고: 삭제된 강의는 inactive 상태로 전환됩니다.")
+                _, msg = admin_service.delete_course(target_course.code, target_course.section)
+                print(msg)
+                _save_all(store, students, admins, courses, enrollments, completed, config)
+                input("엔터를 누르면 메뉴로 돌아갑니다. >")
+                break
         elif choice == "7":
             print("===== 강의 활성화 =====")
-            code = input("활성화할 과목코드 입력 (0: 돌아가기) > ").strip()
-            if code == "0":
-                continue
-            section = input("활성화할 분반코드 입력 > ").strip()
-            target_c = courses.get((code, section))
-            if not target_c:
-                print("!!! 오류: 존재하지 않는 개설 강의입니다.")
-                continue
-            print("[대상 강의 정보]")
-            print(f"과목코드: {target_c.code} | 분반코드: {target_c.section} | "
-                  f"과목명: {target_c.name} | 시간: {target_c.day} {target_c.time_text()} | 상태: {target_c.status}")
-            if target_c.status == "active":
-                print("!!! 안내: 이미 active 상태의 강의입니다.")
-                continue
-            confirm = input("해당 강의를 활성화하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-            if confirm != "1":
-                continue
-            _, msg = admin_service.activate_course(code, section)
-            print(msg)
-            _save_all(store, students, admins, courses, enrollments, completed, config)
-            input("엔터를 누르면 메뉴로 돌아갑니다. >")
+            while True:
+                code = input("활성화할 과목코드 입력 (0: 돌아가기) > ").strip()
+                if code == "0":
+                    break
+                section = input("활성화할 분반코드 입력 > ").strip()
+                target_c = courses.get((code, section))
+                if not target_c:
+                    print("!!! 오류: 존재하지 않는 개설 강의입니다.")
+                    continue
+                print("[대상 강의 정보]")
+                print(f"과목코드: {target_c.code} | 분반코드: {target_c.section} | "
+                      f"과목명: {target_c.name} | 시간: {target_c.day} {target_c.time_text()} | 상태: {target_c.status}")
+                if target_c.status == "active":
+                    print("!!! 안내: 이미 active 상태의 강의입니다.")
+                    break
+                confirm = input("해당 강의를 활성화하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    break
+                _, msg = admin_service.activate_course(code, section)
+                print(msg)
+                _save_all(store, students, admins, courses, enrollments, completed, config)
+                input("엔터를 누르면 메뉴로 돌아갑니다. >")
+                break
         elif choice == "8":
             print("===== 전체 수강 현황 =====")
             print("과목코드 | 분반코드 | 과목명 | 정원 | 신청 인원")

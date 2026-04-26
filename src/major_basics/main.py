@@ -181,6 +181,15 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
                 print(f"총 {len(completed)}개 과목 이수 완료.")
         elif choice == "4":
             code = input("기이수 추가 과목코드 > ").strip()
+            if student_service.is_currently_enrolled(code):
+                confirm = input(
+                    "수강신청 중입니다. 기이수 처리하시겠습니까? (1: 예 / 0: 아니오) > "
+                ).strip()
+                if confirm != "1":
+                    print("기이수 처리가 취소되었습니다.")
+                    continue
+                student_service.force_cancel_enrollment(code)
+                print("수강신청이 취소 처리되었습니다.")
             _, msg = student_service.add_completed(code)
             print(msg)
         elif choice == "5":

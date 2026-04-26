@@ -44,6 +44,24 @@ class StudentService:
         bucket.add(course_code)
         return True, "✓ 기이수 과목 등록 완료"
 
+    def is_currently_enrolled(self, course_code: str) -> bool:
+        """Return True if student has an active 'enrolled' status for this course code."""
+        return any(code == course_code for code, _ in self._active_enrolled_map())
+
+    def force_cancel_enrollment(self, course_code: str) -> None:
+        """Cancel enrollment without registration-period check (used for 기이수 processing)."""
+        for i, e in enumerate(self.enrollments):
+            if (
+                e.student_id == self.student.student_id
+                and e.course_code == course_code
+                and e.status == "enrolled"
+            ):
+                from major_basics.modules.models import Enrollment
+                self.enrollments[i] = Enrollment(
+                    e.student_id, e.course_code, e.section, "cancelled"
+                )
+                return
+
     def is_retake(self, course_code: str) -> bool:
         return course_code in self.completed.get(self.student.student_id, set())
 

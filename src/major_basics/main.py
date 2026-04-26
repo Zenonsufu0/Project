@@ -227,11 +227,48 @@ def _student_menu(student_service: StudentService, courses: dict, enrollments: l
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
-            code = input("신청 과목코드(4자리) > ").strip()
-            section = input("분반코드(2자리) > ").strip()
-            _, msg, _ = student_service.register(code, section)
-            print(msg)
-            print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            print("===== 수강신청 =====")
+            raw = input("과목명 또는 과목코드와 분반코드 입력 (0: 돌아가기) > ").strip()
+            if raw == "0":
+                continue
+            parts = raw.split()
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                code, section = parts
+                course = courses.get((code, section))
+                if course:
+                    print("\n[선택된 과목]")
+                    print(f"과목코드: {course.code} | 분반코드: {course.section} | "
+                          f"과목명: {course.name} | 학점: {course.credits} | "
+                          f"{course.day} {course.time_text()} | {course.professor}")
+                confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    continue
+                _, msg, _ = student_service.register(code, section)
+                print(msg)
+                print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            else:
+                results = student_service.search_courses(raw)
+                if not results:
+                    print("검색 결과가 없습니다.")
+                    continue
+                _print_courses(results)
+                pick = input("번호 선택 (0: 돌아가기) > ").strip()
+                if pick == "0":
+                    continue
+                if not pick.isdigit() or int(pick) < 1 or int(pick) > len(results):
+                    print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+                    continue
+                selected = results[int(pick) - 1]
+                print("\n[선택된 과목]")
+                print(f"과목코드: {selected.code} | 분반코드: {selected.section} | "
+                      f"과목명: {selected.name} | 학점: {selected.credits} | "
+                      f"{selected.day} {selected.time_text()} | {selected.professor}")
+                confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+                if confirm != "1":
+                    continue
+                _, msg, _ = student_service.register(selected.code, selected.section)
+                print(msg)
+                print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
         elif choice == "6":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")

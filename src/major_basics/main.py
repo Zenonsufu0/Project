@@ -387,6 +387,9 @@ def _admin_menu(admin_service: AdminService, colleges, store, students, admins, 
             print(msg)
             _save_all(store, students, admins, courses, enrollments, completed, config)
         elif choice == "5":
+            if config.reg_start <= config.current_date <= config.reg_end:
+                print("!!! 오류: 수강신청 기간 중에는 강의를 수정할 수 없습니다.")
+                continue
             print("===== 강의 수정 =====")
             course = _input_course()
             if course is None:

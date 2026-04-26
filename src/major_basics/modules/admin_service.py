@@ -65,7 +65,7 @@ class AdminService:
         return True, f"✓ 강의 등록 완료: {course.name} ({course.code}-{course.section})"
 
     def update_course(self, course: Course) -> tuple[bool, str]:
-        if self.config.current_date >= self.config.reg_start:
+        if self.config.reg_start <= self.config.current_date <= self.config.reg_end:
             return False, "!!! 오류: 수강신청 기간 중에는 강의를 수정할 수 없습니다."
         existing = self.courses.get(course.key())
         if not existing:

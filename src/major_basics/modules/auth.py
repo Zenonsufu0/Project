@@ -17,7 +17,7 @@ class AuthService:
     # [추가] 실시간 학번 검사
     def validate_student_id(self, student_id: str) -> tuple[bool, str]:
         if not student_id.isdigit() or len(student_id) != 9:
-            return False, "학번은 숫자 9자리이어야 합니다."
+            return False, "학번은 숫자 9자리여야 합니다."
         if student_id in self.students or student_id in self.admins:
             return False, "이미 존재하는 학번입니다."
         return True, "사용 가능한 학번입니다."
@@ -49,22 +49,17 @@ class AuthService:
             return False, "이름은 한국어 완성형 글자로만 이루어져야 합니다."
         return True, "사용 가능한 이름입니다."
 
+    # [★2차 추가] 실시간 학년 형식 검사
+    def validate_grade(self, grade_str: str) -> tuple[bool, str]:
+        if grade_str not in ("1", "2", "3", "4"):
+            return False, "학년은 1 이상 4 이하의 정수이어야 합니다."
+        return True, "사용 가능한 학년입니다."
+
     # 기존 함수 유지 (매개변수 password_check는 내부 로직용으로 남겨둠)
-    def signup_student(self, student_id, password, password_check, name, college, major):
-        student = Student(student_id, password, name, college, major, "active")
+    def signup_student(self, student_id, password, password_check, name, college, major, grade):
+        student = Student(student_id, password, name, college, major, "active", grade)
         self.students[student.student_id] = student
         return True, "회원가입 완료", student
-
-    def check_user_id(self, user_id: str) -> tuple[bool, str]:
-        """기획서 6.4: ID 존재·활성 여부만 확인 (비밀번호 미검증)."""
-        student = self.students.get(user_id)
-        if student:
-            if student.status != "active":
-                return False, "!!! 오류: 비활성화된 계정입니다."
-            return True, ""
-        if user_id in self.admins:
-            return True, ""
-        return False, "!!! 오류: 존재하지 않는 계정입니다."
 
     def login(self, user_id: str, password: str) -> tuple[str, object | None, str]:
         student = self.students.get(user_id)

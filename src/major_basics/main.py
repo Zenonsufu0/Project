@@ -214,8 +214,12 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
         print("2. 과목 검색")
         print("3. 기이수 과목 조회")
         print("4. 기이수 과목 추가")
-        print("5. 수강신청")
-        print("6. 수강취소")
+        if student_service.is_registration_open():
+            print("5. 수강신청")
+            print("6. 수강취소")
+        else:
+            print("5. 수강신청 [기간 외]")
+            print("6. 수강취소 [기간 외]")
         print("7. 신청 내역 조회")
         print("8. 내 시간표 조회")
         print("0. 로그아웃")
@@ -225,14 +229,10 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
         if choice == "1":
             print(f"===== 개설 과목 목록 ({config.semester}) =====")
             _print_courses(student_service.list_courses(), schedules, classrooms, _enrolled_counts(enrollments))
+            input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         elif choice == "2":
-            keyword = input("과목명 검색어 > ").strip()
-            results = student_service.search_courses(keyword)
-            if not results:
-                print("검색 결과가 없습니다.")
-            else:
-                _print_courses(results, schedules, classrooms, _enrolled_counts(enrollments))
-                print(f"총 {len(results)}건 검색됨.")
+            # 기획서 6.7.2: 과목 검색 → (선택) 번호. 단독 조회이므로 선택 결과는 사용하지 않음
+            _search_and_select_course(student_service, schedules, classrooms)
         elif choice == "3":
             print("===== 기이수 과목 목록 =====")
             completed = student_service.list_completed()
@@ -243,13 +243,29 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
                 print(hdr)
                 print(_header_sep(hdr))
                 for i, code in enumerate(completed, 1):
-                    name = next((c.name for c in courses.values() if c.code == code), "(알 수 없음)")
+                    name = next((c.name for c in courses.values() if c.code == code), "(삭제된 강의)")
                     print(f"{i} | {code} | {name}")
                 print(f"총 {len(completed)}개 과목 이수 완료.")
+            input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         elif choice == "4":
-            code = input("기이수 추가 과목코드 > ").strip()
-            _, msg = student_service.add_completed(code)
-            print(msg)
+            course = _search_and_select_course(student_service, schedules, classrooms)
+            if course is None:
+                continue
+            code = course.code
+            if student_service.is_currently_enrolled(code):
+                confirm = input(
+                    "이 과목은 현재 수강신청 중입니다. 기이수로 추가하시겠습니까? (1: 예 / 0: 아니오) > "
+                ).strip()
+                if confirm != "1":
+                    print("기이수 처리가 취소되었습니다.")
+                    continue
+                student_service.force_cancel_enrollment(code)
+                print("수강신청이 취소 처리되었습니다.")
+            ok, msg = student_service.add_completed(code)
+            if ok:
+                print(f"기이수 과목으로 추가되었습니다: {course.name}")
+            else:
+                print(msg)
         elif choice == "5":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
@@ -278,8 +294,10 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
                         f"{credits} | {enrollment.status} | {retake}"
                     )
                 print(f"총 신청 학점 (enrolled): {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
+            input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         elif choice == "8":
             _print_timetable(student_service, classrooms)
+            input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         elif choice == "0":
             print("로그아웃합니다.")
             break
@@ -287,31 +305,79 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
+def _search_and_select_course(student_service, schedules, classrooms):
+    """기획서 6.7.2: 과목명 검색 → 번호 선택 → Course 반환 (0/재검색 거부 → None)."""
+    while True:
+        keyword = input("과목명 검색어 > ").strip()
+        results = student_service.search_courses(keyword)
+        if not results:
+            print("검색 결과가 없습니다.")
+            retry = input("다시 검색하시겠습니까? (1: 재검색 / 0: 돌아가기) > ").strip()
+            if retry != "1":
+                return None
+            continue
+        _print_courses(results, schedules, classrooms, show_capacity=False)
+        print(f"총 {len(results)}건 검색됨.")
+        while True:
+            sel = input("선택 번호 입력 (0: 돌아가기) > ").strip()
+            if sel == "0":
+                return None
+            if sel.isdigit() and 1 <= int(sel) <= len(results):
+                return results[int(sel) - 1]
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+
+
+def _print_course_detail(selected, schedules, classrooms, prerequisites, courses) -> None:
+    key = (selected.code, selected.section)
+    sched_t = _schedule_text(key, schedules)
+    room_t = _room_text(key, schedules, classrooms)
+    print("\n[선택된 과목]")
+    print(f"과목코드: {selected.code} | 분반코드: {selected.section} | 과목명: {selected.name} | 학점: {selected.credits}")
+    print(f"스케줄: {sched_t} | 강의실: {room_t} | 담당교수: {selected.professor}")
+    prereq_codes = sorted(prerequisites.get(selected.code, set()))
+    if prereq_codes:
+        names = ", ".join(
+            f"[{pc}] " + next((c.name for c in courses.values() if c.code == pc), "")
+            for pc in prereq_codes
+        )
+        print(f"선수과목: {names}")
+    else:
+        print("선수과목: 없음")
+
+
 def _do_register(student_service, schedules, classrooms, prerequisites) -> None:
     print("===== 수강신청 =====")
-    code = input("신청 과목코드(4자리) > ").strip()
-    section = input("분반코드(2자리) > ").strip()
-    course = student_service.courses.get((code, section))
-    if course is not None:
-        print("[선택된 과목]")
-        sched_t = _schedule_text((code, section), schedules)
-        room_t = _room_text((code, section), schedules, classrooms)
-        print(f"과목코드: {code} | 분반코드: {section} | 과목명: {course.name} | 학점: {course.credits}")
-        print(f"스케줄: {sched_t} | 강의실: {room_t} | 담당교수: {course.professor}")
-        prereq_codes = sorted(prerequisites.get(code, set()))
-        if prereq_codes:
-            names = ", ".join(
-                f"[{pc}] " + next((c.name for c in student_service.courses.values() if c.code == pc), "")
-                for pc in prereq_codes
-            )
-            print(f"선수과목: {names}")
-        else:
-            print("선수과목: 없음")
-        confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
-        if confirm != "1":
-            print("!!! 안내: 수강신청이 취소되었습니다.")
+    raw = input("과목명 또는 과목코드와 분반코드 입력 (0: 돌아가기) > ").strip()
+    if raw == "0":
+        return
+    parts = raw.split()
+    if (len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 4
+            and parts[1].isdigit() and len(parts[1]) == 2):
+        # 과목코드+분반코드 직접 입력
+        selected = student_service.courses.get((parts[0], parts[1]))
+        if not selected or selected.status != "active":
+            print("검색 결과가 없습니다.")
             return
-    _, msg, _ = student_service.register(code, section)
+    else:
+        # 과목명 검색 분기 (기획서 6.9 형식)
+        results = student_service.search_courses(raw)
+        if not results:
+            print("검색 결과가 없습니다.")
+            return
+        _print_courses(results, schedules, classrooms, show_capacity=False)
+        print(f"총 {len(results)}건 검색됨.")
+        pick = input("번호 선택 (0: 돌아가기) > ").strip()
+        if pick == "0":
+            return
+        if not pick.isdigit() or int(pick) < 1 or int(pick) > len(results):
+            print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
+            return
+        selected = results[int(pick) - 1]
+    _print_course_detail(selected, schedules, classrooms, prerequisites, student_service.courses)
+    confirm = input("신청하시겠습니까? (1: 예 / 0: 아니오) > ").strip()
+    if confirm != "1":
+        return
+    _, msg, _ = student_service.register(selected.code, selected.section)
     print(msg)
     print(f"현재 총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
 

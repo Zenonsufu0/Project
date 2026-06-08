@@ -68,6 +68,20 @@ class StudentService:
     def is_retake(self, course_code: str) -> bool:
         return course_code in self.completed.get(self.student.student_id, set())
 
+    def is_currently_enrolled(self, course_code: str) -> bool:
+        """해당 과목코드로 현재 enrolled 상태인 신청이 있으면 True (분반 무관)."""
+        return any(code == course_code for code, _ in self._active_enrolled_map())
+
+    def force_cancel_enrollment(self, course_code: str) -> None:
+        """수강신청 기간 검사 없이 강제 취소 (기이수 처리용)."""
+        for i, e in enumerate(self.enrollments):
+            if (
+                e.student_id == self.student.student_id
+                and e.course_code == course_code
+                and e.status == "enrolled"
+            ):
+                self.enrollments[i] = Enrollment(e.student_id, e.course_code, e.section, "cancelled")
+
     def schedules_of(self, key: tuple[str, str]) -> list[Schedule]:
         return self.schedules.get(key, [])
 

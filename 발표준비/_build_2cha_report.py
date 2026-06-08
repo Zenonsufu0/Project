@@ -390,6 +390,52 @@ def _verify(rows):
     return mismatch
 
 
+# 2차에서 더 이상 그 장면·방법으로 입력할 수 없거나 결과가 달라진 1차 TC → 보고서에서 삭제.
+# (교수 안내: 그대로 동작하리라 확신하는 TC만 복붙할 것)  (id, 목표셀 부분일치)
+REMOVE_TCS = [
+    ("5.5-3", ""),      # config 자동생성 내용 2필드 → 2차는 3필드(학기 포함)
+    ("5.5-9", ""),      # config 2필드 입력 → 2차는 필드수 오류(다른 경로)
+    ("5.5-10", ""),     # config 2필드 입력 → 2차는 필드수 오류
+    ("6.3-1", "정상 회원가입"),   # 학년 입력 단계 추가로 옛 입력 순서로 완료 불가
+    ("6.6-10", ""),     # '9' → 2차는 수강신청 기간 설정(유효), 오류 아님
+    ("6.7-1", ""),      # 개설과목 조회 출력형식 변경(스케줄/강의실/제한)
+    ("6.7-3", ""),      # 검색 결과 출력형식 변경
+    ("6.7-6", ""),      # inactive 제외 — 출력형식 변경
+    ("6.9-9", ""),      # '시간표 충돌' → 2차 '스케줄 충돌' 메시지 변경
+    ("6.12-1", ""),     # 시간표 출력형식 변경(강의실 추가)
+    ("6.13-1", ""),     # 학생 등록 — 학년 입력 단계 추가로 옛 흐름 불가
+    ("6.14-1", "강의 등록 정상"),       # 등록 흐름 변경(학기/제한/스케줄 분리)
+    ("6.14-3", ""),     # 종료≤시작 — 옛 강의등록 인라인 시각입력 흐름 변경
+    ("6.14-4", "기간 외 정상"),         # 통합 강의 수정 → 항목별 수정으로 재설계
+    ("6.14-5", ""),     # '기간 중 수정 차단(통째)' 메시지 — 2차 미사용
+    ("6.14-7", "종료 후 차단"),         # 기간 종료 후 통째 차단 — 2차 미사용
+    ("6.15-1", ""),     # 기간 설정 — 학기 입력 추가로 옛 흐름/메시지 변경
+    ("6.15-2", ""),     # 동일
+]
+
+
+def _delete_invalid_1cha_rows(d):
+    import re as _re
+    removed = 0
+    for tbl in d.tables:
+        to_del = []
+        for row in tbl.rows:
+            rid_raw = row.cells[0].text.strip()
+            m = _re.match(r"(\d+\.\d+-\d+)", rid_raw)
+            if not m:
+                continue
+            rid = m.group(1)
+            goal = row.cells[1].text
+            for tid, sub in REMOVE_TCS:
+                if rid == tid and (sub == "" or sub in goal):
+                    to_del.append(row)
+                    break
+        for row in to_del:
+            row._tr.getparent().remove(row._tr)
+            removed += 1
+    return removed
+
+
 def build_docx(rows):
     import docx
     from docx.shared import Pt, RGBColor
@@ -400,6 +446,8 @@ def build_docx(rows):
     out = ROOT / "발표준비" / "B04_2차_검사_보고서.docx"
     shutil.copy(src, out)
     d = docx.Document(str(out))
+
+    removed = _delete_invalid_1cha_rows(d)
 
     NEW = RGBColor(0x70, 0x30, 0xA0)   # 보라 = 2차 신규/변경 검사
     BLACK = RGBColor(0, 0, 0)
@@ -445,19 +493,26 @@ def build_docx(rows):
     d.add_heading("색상 범례", level=2)
     legend = d.add_paragraph()
     legend.add_run("● 검정(기본): ").bold = True
-    legend.add_run("1차에서 검사했고 2차 구현에 영향받지 않아 그대로 승계한 TC(복붙). 본 보고서 2~16절의 1차 TC 전체가 이에 해당.\n")
+    legend.add_run(
+        "1차에서 검사했고 2차에서도 동일한 장면·방법으로 입력·동작하리라 확신하여 선별 승계한 TC(복붙). "
+        "본 보고서 2~16절의 1차 TC가 이에 해당.\n"
+    )
     r = legend.add_run("● 보라: ")
     r.bold = True
     r.font.color.rgb = NEW
     legend.add_run("2차에서 처음 검사한 신규·변경 TC(목표/입력/예상결과 중 하나 이상이 1차와 달라짐). 본 17절 전체가 이에 해당.\n")
     note = d.add_paragraph()
-    note.add_run("※ 검사 수행 비율에 따라 '검정=복붙'을 기본으로 두고, 2차에서 새로 검사한 항목만 보라로 강조한다(강의자료 #10 8쪽 허용).").italic = True
+    note.add_run(
+        f"※ 검사 수행 비율에 따라 '검정=복붙'을 기본으로 두고, 2차에서 새로 검사한 항목만 보라로 강조한다(강의자료 #10 8쪽 허용). "
+        f"1차 TC 중 2차 구현물에서 더 이상 그 장면·방법으로 입력할 수 없거나 결과가 달라진 {removed}개는 "
+        f"본 보고서에서 삭제하고 17절의 보라색 TC로 대체·재검증하였다."
+    ).italic = True
 
     # 변경 안내
-    d.add_heading("1차 기능 중 2차 구조 변경으로 재검증된 항목", level=2)
+    d.add_heading("1차 기능 중 2차 구조 변경으로 삭제·재검증된 항목", level=2)
     chg = d.add_paragraph()
     chg.add_run(
-        "다음 1차 기능은 2차 데이터 구조·규칙 변경으로 동작이 바뀌어, 아래 신규 TC로 재검증하였다:\n"
+        "다음 1차 기능은 2차 데이터 구조·규칙 변경으로 입력 방법 또는 결과가 바뀌어, 해당 1차 TC는 삭제하고 아래 신규 TC로 재검증하였다:\n"
         "· 5.5 무결성: classrooms/schedules/prerequisites 3개 파일 추가, students(7필드)·courses(10필드)·config(3필드) 스키마 변경 → 5.5-12~22\n"
         "· 6.3/6.13 회원가입·학생등록: 학년 입력 추가 → 6.3-14~15\n"
         "· 6.7 개설과목 조회: 스케줄·강의실·제한 표시 및 학기 필터 → 6.7-7~9\n"
@@ -508,13 +563,15 @@ def build_docx(rows):
             ar.font.color.rgb = RGBColor(0xC0, 0x00, 0x00) if actual.startswith("[EXC]") else BLACK
 
     # 요약
+    kept = 129 - removed
     d.add_heading("2차 검사 요약", level=2)
     summ = d.add_paragraph()
-    summ.add_run(f"· 2차 신규·변경 TC: 총 {len(rows)}개 (전부 실측, 예상결과 부합)\n")
-    summ.add_run("· 1차 TC(2~16절): 129개 승계(복붙). 2차 구현에 영향받지 않는 항목은 그대로 유지.\n")
-    summ.add_run(f"· 전체 TC: 129 + {len(rows)} = {129 + len(rows)}개")
+    summ.add_run(f"· 1차 TC 129개 중 {removed}개 삭제(2차에서 수행 불가/결과 변경) → 선별 승계 {kept}개(검정=복붙)\n")
+    summ.add_run(f"· 2차 신규·변경 TC: {len(rows)}개(보라, 전부 실측·예상결과 부합)\n")
+    summ.add_run(f"· 전체 TC: {kept} + {len(rows)} = {kept + len(rows)}개")
 
     d.save(str(out))
+    print(f"[build] removed {removed} invalid 1차 TCs; kept {kept}; added {len(rows)} 2차 TCs")
     return out
 
 

@@ -1,3 +1,4 @@
+# models.py — 전 모듈이 공유하는 데이터 클래스 정의 (공통 협업)
 from dataclasses import dataclass
 from datetime import date
 
@@ -6,8 +7,7 @@ VALID_DAYS = frozenset(DAY_ORDER.keys())
 
 
 def default_semester(current_date: date) -> str:
-    """config.txt 미존재 시 자동 생성 기본 학기.
-    월 1~6이면 YYYY-1, 7~12이면 YYYY-2 (설계문서 2.7)."""
+    """config.txt 자동 생성 시 기본 학기 — 1~6월 YYYY-1, 7~12월 YYYY-2 (설계 2.7)."""
     half = 1 if current_date.month <= 6 else 2
     return f"{current_date.year}-{half}"
 

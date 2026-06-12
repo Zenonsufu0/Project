@@ -1,3 +1,4 @@
+# storage.py — 데이터 파일 10종의 입출력과 문법·참조 무결성 검사 담당 (구현: 조서현)
 import re
 from datetime import date
 from pathlib import Path
@@ -107,9 +108,7 @@ class DataStore:
             # 기획서 5.2.3: 알고리즘(1003)의 선수과목은 자료구조(1002)
             self.prerequisites_path.write_text("1003,1002\n", encoding="utf-8")
 
-    # ------------------------------------------------------------
-    # students
-    # ------------------------------------------------------------
+    # --- students ---
     def load_students(self) -> dict[str, Student]:
         students: dict[str, Student] = {}
         for row in self._rows(self.students_path):
@@ -132,9 +131,7 @@ class DataStore:
             )
         self._write_lines(self.students_path, lines)
 
-    # ------------------------------------------------------------
-    # admins
-    # ------------------------------------------------------------
+    # --- admins ---
     def load_admins(self) -> dict[str, Admin]:
         admins: dict[str, Admin] = {}
         for row in self._rows(self.admins_path):
@@ -150,9 +147,7 @@ class DataStore:
             lines.append(f"{admin.admin_id},{admin.password},{admin.name}")
         self._write_lines(self.admins_path, lines)
 
-    # ------------------------------------------------------------
-    # courses (★요일·시각 제거, 학기·제한학년·제한학과 추가 → 10 필드)
-    # ------------------------------------------------------------
+    # --- courses (★요일·시각 제거, 학기·제한학년·제한학과 추가 → 10 필드) ---
     def load_courses(self) -> dict[tuple[str, str], Course]:
         courses: dict[tuple[str, str], Course] = {}
         for row in self._rows(self.courses_path):
@@ -185,9 +180,7 @@ class DataStore:
             )
         self._write_lines(self.courses_path, lines)
 
-    # ------------------------------------------------------------
-    # schedules (★2차 신규)
-    # ------------------------------------------------------------
+    # --- schedules (★2차 신규) ---
     def load_schedules(self) -> dict[tuple[str, str], list[Schedule]]:
         schedules: dict[tuple[str, str], list[Schedule]] = {}
         for row in self._rows(self.schedules_path):
@@ -222,9 +215,7 @@ class DataStore:
         ]
         self._write_lines(self.schedules_path, lines)
 
-    # ------------------------------------------------------------
-    # classrooms (★2차 신규)
-    # ------------------------------------------------------------
+    # --- classrooms (★2차 신규) ---
     def load_classrooms(self) -> dict[str, Classroom]:
         classrooms: dict[str, Classroom] = {}
         for row in self._rows(self.classrooms_path):
@@ -244,9 +235,7 @@ class DataStore:
             lines.append(f"{room.classroom_code},{room.building},{room.room_number},{room.seats}")
         self._write_lines(self.classrooms_path, lines)
 
-    # ------------------------------------------------------------
-    # prerequisites (★2차 신규)
-    # ------------------------------------------------------------
+    # --- prerequisites (★2차 신규) ---
     def load_prerequisites(self) -> dict[str, set[str]]:
         prerequisites: dict[str, set[str]] = {}
         for row in self._rows(self.prerequisites_path):
@@ -263,9 +252,7 @@ class DataStore:
                 lines.append(f"{target},{prereq}")
         self._write_lines(self.prerequisites_path, lines)
 
-    # ------------------------------------------------------------
-    # enrollments / completed / colleges
-    # ------------------------------------------------------------
+    # --- enrollments / completed / colleges ---
     def load_enrollments(self) -> list[Enrollment]:
         enrollments: list[Enrollment] = []
         for row in self._rows(self.enrollments_path):
@@ -319,9 +306,7 @@ class DataStore:
                 lines.append(f"{college},{major}")
         self._write_lines(self.colleges_path, lines)
 
-    # ------------------------------------------------------------
-    # config (★학기 필드 추가 → 3 필드)
-    # ------------------------------------------------------------
+    # --- config (★학기 필드 추가 → 3 필드) ---
     def load_config(self, current_date: date) -> Config:
         rows = self._rows(self.config_path)
         if not rows or len(rows[0]) not in (2, 3):
@@ -347,9 +332,7 @@ class DataStore:
             [f"{config.reg_start.isoformat()},{config.reg_end.isoformat()},{config.semester}"],
         )
 
-    # ------------------------------------------------------------
-    # 무결성 확인 (기획서 5.5절)
-    # ------------------------------------------------------------
+    # --- 무결성 확인 (기획서 5.5절) ---
     def validate_integrity(self) -> list[str]:
         errors: list[str] = []
 
@@ -697,9 +680,7 @@ class DataStore:
 
         return errors
 
-    # ------------------------------------------------------------
-    # 내부 유틸
-    # ------------------------------------------------------------
+    # --- 내부 유틸 ---
     @staticmethod
     def _rows(path: Path) -> list[list[str]]:
         if not path.exists():

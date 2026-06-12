@@ -1,3 +1,4 @@
+# main.py — CLI 진입점: 메뉴 흐름·입출력만 담당, 규칙은 서비스 모듈에 위임 (구현: 이강준)
 import sys
 import unicodedata
 from datetime import date

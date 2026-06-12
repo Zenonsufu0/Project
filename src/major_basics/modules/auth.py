@@ -1,4 +1,5 @@
-﻿import re
+# auth.py — 로그인·회원가입과 ID/비밀번호/이름/학년 형식 검증 담당 (구현: 박성수)
+import re
 
 from major_basics.modules.models import Admin, Student
 

@@ -1,1 +1,1 @@
-﻿"""Five submodules for the course registration project."""
+"""Five submodules for the course registration project."""

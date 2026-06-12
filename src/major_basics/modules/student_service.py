@@ -1,3 +1,4 @@
+# student_service.py — 수강신청 11단계 검사·취소·기이수·시간표 규칙 담당 (구현: 이도현)
 from major_basics.modules.models import (
     Classroom,
     Config,
@@ -210,9 +211,7 @@ class StudentService:
     def is_registration_open(self) -> bool:
         return self.config.reg_start <= self.config.current_date <= self.config.reg_end
 
-    # ------------------------------------------------------------
-    # 2차 보조 검사 메서드
-    # ------------------------------------------------------------
+    # --- 2차 보조 검사 메서드 ---
     def _check_semester(self, course: Course) -> bool:
         return course.semester == self.config.semester
 

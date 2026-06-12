@@ -1,7 +1,4 @@
-﻿"""Root entry point.
-
-Allows running the project with: python main.py
-"""
+# 실행 진입점 — 프로젝트 루트에서 python main.py 로 실행
 
 from pathlib import Path
 import sys

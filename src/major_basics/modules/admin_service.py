@@ -1,3 +1,4 @@
+# admin_service.py — 학생·강의·강의실 관리와 수강신청 기간 설정 규칙 담당 (구현: 신경환)
 import re
 from datetime import date
 
@@ -35,9 +36,7 @@ class AdminService:
         self.classrooms = classrooms
         self.prerequisites = prerequisites
 
-    # ------------------------------------------------------------
-    # 학생 관리
-    # ------------------------------------------------------------
+    # --- 학생 관리 ---
     def register_student(self, student: Student) -> tuple[bool, str]:
         if not (student.student_id.isdigit() and len(student.student_id) == 9):
             return False, "!!! 오류: 학번은 숫자 9자리이어야 합니다."
@@ -74,9 +73,7 @@ class AdminService:
         student.status = "active"
         return True, f"✓ 학생 활성화 완료: {student_id}"
 
-    # ------------------------------------------------------------
-    # 강의 등록
-    # ------------------------------------------------------------
+    # --- 강의 등록 ---
     def add_course(self, course: Course, new_schedules: list[Schedule]) -> tuple[bool, str]:
         valid, msg = self._validate_course_fields(course)
         if not valid:
@@ -112,9 +109,7 @@ class AdminService:
         self.schedules[course.key()] = list(new_schedules)
         return True, f"✓ 강의 등록 완료: {course.name} ({course.code}-{course.section}) | 스케줄 {len(new_schedules)}개"
 
-    # ------------------------------------------------------------
-    # 강의 수정 — 항목별 (설계 6.4)
-    # ------------------------------------------------------------
+    # --- 강의 수정 — 항목별 (설계 6.4) ---
     def update_course_name(self, code: str, section: str, name: str) -> tuple[bool, str]:
         course, msg = self._editable_course(code, section)
         if not course:
@@ -239,9 +234,7 @@ class AdminService:
         bucket.remove(target)
         return True, f"✓ 스케줄 삭제 완료: {day} {target.time_text()}"
 
-    # ------------------------------------------------------------
-    # 강의 삭제 / 활성화 (변경 없음)
-    # ------------------------------------------------------------
+    # --- 강의 삭제 / 활성화 (변경 없음) ---
     def delete_course(self, code: str, section: str) -> tuple[bool, str]:
         if not (code.isdigit() and len(code) == 4):
             return False, "!!! 오류: 과목코드는 숫자 4자리여야 합니다."
@@ -268,9 +261,7 @@ class AdminService:
         course.status = "active"
         return True, f"✓ 강의 활성화 완료: {course.name} ({code}-{section})"
 
-    # ------------------------------------------------------------
-    # 수강신청 기간 설정 (★학기 추가)
-    # ------------------------------------------------------------
+    # --- 수강신청 기간 설정 (★학기 추가) ---
     def set_registration_period(self, start: date, end: date, semester: str) -> tuple[bool, str]:
         if not (date(2000, 1, 1) <= start <= date(2099, 12, 31)):
             return False, "!!! 오류: 날짜는 2000-01-01 ~ 2099-12-31 범위여야 합니다."
@@ -285,9 +276,7 @@ class AdminService:
         self.config.semester = semester
         return True, f"✓ 수강신청 기간 설정 완료: {start.isoformat()} ~ {end.isoformat()} | 학기: {semester}"
 
-    # ------------------------------------------------------------
-    # 강의실 관리 (★2차 신규)
-    # ------------------------------------------------------------
+    # --- 강의실 관리 (★2차 신규) ---
     def add_classroom(self, classroom: Classroom) -> tuple[bool, str]:
         if not (classroom.classroom_code.isdigit() and len(classroom.classroom_code) == 4):
             return False, "!!! 오류: 강의실코드는 숫자 4자리여야 합니다."
@@ -305,9 +294,7 @@ class AdminService:
     def list_classrooms(self) -> list[Classroom]:
         return sorted(self.classrooms.values(), key=lambda x: x.classroom_code)
 
-    # ------------------------------------------------------------
-    # 전체 수강 현황
-    # ------------------------------------------------------------
+    # --- 전체 수강 현황 ---
     def enrollment_summary(self) -> list[tuple[Course, int]]:
         latest: dict[tuple[str, tuple[str, str]], str] = {}
         for enrollment in self.enrollments:
@@ -323,9 +310,7 @@ class AdminService:
             result.append((self.courses[key], counts.get(key, 0)))
         return result
 
-    # ------------------------------------------------------------
-    # 내부 유틸
-    # ------------------------------------------------------------
+    # --- 내부 유틸 ---
     def _validate_course_fields(self, course: Course) -> tuple[bool, str]:
         if not (course.code.isdigit() and len(course.code) == 4):
             return False, "!!! 오류: 과목코드는 숫자 4자리여야 합니다."

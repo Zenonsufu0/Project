@@ -136,6 +136,18 @@ tc("5.5-22", "[목표] courses.txt 미존재 제한학과 → 참조 무결성 �
    "!!! 오류: 참조 무결성 위반 - courses.txt ... 제한학과(전공)",
    lambda: _integrity_after("courses.txt", "1001,01,프로그래밍기초,3,김교수,active,30,2026-1,0,없는학과\n"))
 
+tc("5.5-23", "[목표] 누락 시 config.txt 자동 생성 — 학기 포함 3필드 (5.2.5절: 1~6월→YYYY-1) / 입력: config.txt 삭제 후 날짜 2026-04-01로 실행",
+   "'2026-04-01,2026-04-01,2026-1' 내용으로 자동 생성",
+   lambda: fresh_store()[0].config_path.read_text(encoding="utf-8").strip())
+
+tc("5.5-24", "[목표] 행 맨 앞 표준 공백 → 문법 오류 (5.1절 공통 규칙) / 입력: students.txt 행 앞에 공백 1개 삽입",
+   "!!! 오류: students.txt 1행 - 문법 형식이 올바르지 않습니다: '행/필드 앞뒤 공백 불허'",
+   lambda: _integrity_after("students.txt", " 202111376,Abc1234,홍길동,공과대학,컴퓨터공학부,active,2\n"))
+
+tc("5.5-25", "[목표] 필드 앞뒤 표준 공백 → 문법 오류 (5.1절 공통 규칙) / 입력: courses.txt 담당교수 필드 뒤 공백",
+   "!!! 오류: courses.txt 1행 - 문법 형식이 올바르지 않습니다: '행/필드 앞뒤 공백 불허'",
+   lambda: _integrity_after("courses.txt", "1001,01,프로그래밍기초,3,김교수 ,active,30,2026-1,0,전체\n"))
+
 
 # ---- 6.3 회원가입(학년) ----
 tc("6.3-14", "[목표] 학년 범위 초과 입력 거부 / 입력: 학년='5'",
@@ -146,6 +158,19 @@ tc("6.3-15", "[목표] 정상 학년으로 회원가입 시 students.txt 7필드
    "active 상태 + 학년 2 포함 7필드 저장",
    lambda: (lambda a: (a.signup_student("202400001", "Pass123", "Pass123", "김건국", "공과대학", "컴퓨터공학부", 2),
                        f"grade={a.students['202400001'].grade}, status={a.students['202400001'].status}")[1])(AuthService({}, {}, {})))
+
+
+# ---- 6.13 관리자 학생 관리(학년) ----
+def _tc_admin_register_student():
+    a = asvc()
+    _ok, msg = a.register_student(Student("202500777", "Pass123", "김건국", "공과대학", "컴퓨터공학부", "active", 2))
+    s = a.students["202500777"]
+    return f"{msg}; grade={s.grade}, status={s.status}"
+
+
+tc("6.13-10", "[목표] 관리자 학생 등록 정상 — 학년 포함 (6.13.1절) / 입력: 학번 202500777, 각 필드 정상, 학년 2",
+   "✓ 학생 등록 완료; grade=2, status=active",
+   _tc_admin_register_student)
 
 
 # ---- 6.7 개설과목 조회(스케줄/제한/학기) ----
@@ -181,6 +206,44 @@ def _semester_filter():
     return f"목록 과목코드={sorted(set(codes))}; 9001 포함={'9001' in codes}"
 
 
+tc("6.7-10", "[목표] inactive 과목 전체 조회 제외 (6.7.1절) / 입력: 1001-01을 inactive로 변경 후 조회",
+   "1001-01은 목록에서 제외, 나머지 active 과목만 출력",
+   lambda: _inactive_excluded())
+
+
+def _inactive_excluded():
+    store, _ = fresh_store()
+    courses = store.load_courses()
+    courses[("1001", "01")].status = "inactive"
+    svc = ssvc(student(grade=2), courses, store.load_schedules(), config=open_config())
+    keys = [f"{c.code}-{c.section}" for c in svc.list_courses()]
+    return f"목록={keys}; 1001-01 포함={'1001-01' in keys}"
+
+
+tc("6.7-11", "[목표] 신청 불가 과목 [제한] 표시 (기획서 7절 — 숨기지 않고 표시만) / 입력: 1학년 학생으로 전체 조회",
+   "1002(2학년 제한)·1003(3학년 제한) 행에 '[제한]' 표시, 목록에는 유지",
+   lambda: _restricted_marker())
+
+
+def _restricted_marker():
+    import io
+    import contextlib
+    import major_basics.main as M
+
+    store, _ = fresh_store()
+    courses = store.load_courses()
+    schedules = store.load_schedules()
+    stu = student(grade=1)
+    svc = ssvc(stu, courses, schedules, config=open_config())
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        M._print_courses(svc.list_courses(), schedules, classrooms(), stu)
+    lines = buf.getvalue().splitlines()
+    row_1002 = next(l for l in lines if "| 1002 |" in l)
+    row_1001 = next(l for l in lines if "| 1001 | 01 |" in l)
+    return f"1002행 [제한]={'[제한]' in row_1002}; 1001행 [제한]={'[제한]' in row_1001}; 1002행 목록 유지=True"
+
+
 # ---- 6.9 수강신청 11단계 ----
 def _reg_case(setup):
     store, _ = fresh_store()
@@ -202,8 +265,8 @@ tc("6.9-17", "[목표] 10단계 학과 제한 차단 / 입력: 전기공학부 2
    "!!! 오류: 이 과목은 컴퓨터공학부 학생만 수강신청할 수 있습니다.",
    lambda: _reg_case(lambda c, s, p: ssvc(student(grade=2, major="전기공학부"), c, s, config=open_config()).register("1002", "01")[1]))
 
-tc("6.9-18", "[목표] 11단계 선수과목 미이수 차단 + 미이수 목록 / 입력: 3학년이 1003(선수 1002 미이수) 신청",
-   "!!! 오류: 선수과목을 이수하지 않았습니다. 미이수 선수과목: [1002] 자료구조",
+tc("6.9-18", "[목표] 11단계 선수과목 미이수 차단 + 미이수 과목명 나열 / 입력: 3학년이 1003(선수 1002 미이수) 신청",
+   "!!! 오류: 선수과목을 이수하지 않았습니다. 미이수 선수과목: 자료구조",
    lambda: _reg_case(lambda c, s, p: ssvc(student(grade=3), c, s, prereq=p, config=open_config()).register("1003", "01")[1]))
 
 tc("6.9-19", "[목표] 선수과목 이수 후 정상 신청 / 입력: 1002 기이수 후 1003 신청",
@@ -332,6 +395,15 @@ tc("6.14-29", "[목표] inactive 강의 수정 차단 / 입력: inactive 상태�
    "!!! 오류: inactive 상태의 강의는 수정할 수 없습니다. 먼저 강의를 활성화하세요.",
    lambda: _inactive_edit())
 
+tc("6.14-30", "[목표] 스케줄 종료 시각 ≤ 시작 시각 오류 (4.8절) / 입력: 신규 강의 스케줄 MON 09:00~09:00",
+   "!!! 오류: 종료 시각은 시작 시각보다 이후여야 합니다.",
+   lambda: asvc().add_course(Course("1006", "01", "신규", 3, "박교수", capacity=30, semester="2026-1"),
+                             [Schedule("1006", "01", "MON", 540, 540, "1001")])[1])
+
+tc("6.14-31", "[목표] 수강신청 기간 시작 전 과목명 변경 정상 (6.14.2절) / 입력: today=03-01 < reg_start=04-01",
+   "✓ 강의 수정 완료: 과목명 → 새이름",
+   lambda: (lambda co: asvc(co[0], co[1], current=date(2026, 3, 1)).update_course_name("1001", "01", "새이름")[1])(_co()))
+
 def _inactive_edit():
     co, sc = _co()
     co[("1001", "01")].status = "inactive"
@@ -346,6 +418,10 @@ tc("6.15-7", "[목표] 잘못된 학기 형식 차단 / 입력: 학기='2026-3'"
 tc("6.15-8", "[목표] 정상 학기 설정 / 입력: 2026-09-01~09-07, 학기='2026-2'",
    "✓ 수강신청 기간 설정 완료: 2026-09-01 ~ 2026-09-07 | 학기: 2026-2",
    lambda: asvc().set_registration_period(date(2026, 9, 1), date(2026, 9, 7), "2026-2")[1])
+
+tc("6.15-9", "[목표] 시작일 = 종료일 경계값 정상 (6.15절 의미 규칙) / 입력: 2026-04-01 ~ 2026-04-01, 학기='2026-1'",
+   "✓ 수강신청 기간 설정 완료: 2026-04-01 ~ 2026-04-01 | 학기: 2026-1",
+   lambda: asvc().set_registration_period(date(2026, 4, 1), date(2026, 4, 1), "2026-1")[1])
 
 
 # ---- 6.17 강의실 관리(신규) ----
@@ -414,6 +490,37 @@ REMOVE_TCS = [
 ]
 
 
+def _renumber_duplicate_ids(d):
+    """1차 보고서부터 있던 중복 TC ID(예: 6.3-8/9/10 2벌)를 섹션 내 다음 번호로 재부여."""
+    import re as _re
+    rows_all = []
+    per_sec_max: dict[str, int] = {}
+    for tbl in d.tables:
+        for row in tbl.rows:
+            m = _re.fullmatch(r"(\d+\.\d+)-(\d+)", row.cells[0].text.strip())
+            if not m:
+                continue
+            sec, num = m.group(1), int(m.group(2))
+            per_sec_max[sec] = max(per_sec_max.get(sec, 0), num)
+            rows_all.append((row, sec, num))
+    seen: set[str] = set()
+    renamed = []
+    for row, sec, num in rows_all:
+        tid = f"{sec}-{num}"
+        if tid in seen:
+            per_sec_max[sec] += 1
+            new_id = f"{sec}-{per_sec_max[sec]}"
+            p = row.cells[0].paragraphs[0]
+            if p.runs:
+                p.runs[0].text = new_id
+                for r in p.runs[1:]:
+                    r.text = ""
+            renamed.append((tid, new_id))
+        else:
+            seen.add(tid)
+    return renamed
+
+
 def _delete_invalid_1cha_rows(d):
     import re as _re
     removed = 0
@@ -448,9 +555,35 @@ def build_docx(rows):
     d = docx.Document(str(out))
 
     removed = _delete_invalid_1cha_rows(d)
+    renamed = _renumber_duplicate_ids(d)
 
     NEW = RGBColor(0x70, 0x30, 0xA0)   # 보라 = 2차 신규/변경 검사
     BLACK = RGBColor(0, 0, 0)
+
+    # 표지·개요를 2차 기준으로 갱신
+    overview_old = (
+        "본 보고서는 '건국 수강신청 시뮬레이터(B04)'의 1차 구현물에 대한 전체 통합 검사 결과를 "
+        "기록한 문서이다. 기획서(1차 기획서 완성본)를 기준으로 테스트 케이스를 작성하였으며, "
+        "브랜치 커버리지 100%를 목표로 구성하였다."
+    )
+    overview_new = (
+        "본 보고서는 '건국 수강신청 시뮬레이터(B04)'의 2차 구현물에 대한 전체 통합 검사 결과를 "
+        "기록한 문서이다. 2차 기획서(설계 기준 1판)와 설계 문서(원판)를 기준으로 테스트 케이스를 "
+        "작성하였으며, 브랜치 커버리지 100%를 목표로 구성하였다. 1차에서 검사했고 2차에서도 동일하게 "
+        "동작함을 확신하는 TC는 선별 승계(검정)하고, 2차에서 새로 검사한 TC는 17절에 보라색으로 구분하였다."
+    )
+    replacements = {
+        "1차 검사 보고서": "2차 검사 보고서",
+        "2026년 4월": "2026년 6월",
+        overview_old: overview_new,
+        "검사 기준: 1차 기획서 완성본 v2": "검사 기준: 2차 기획서 설계 기준 1판 + 설계 문서 원판",
+    }
+    for p in d.paragraphs[:60]:
+        t = p.text
+        for old, new_t in replacements.items():
+            if old == t or (old in t and len(p.runs) == 1):
+                p.runs[0].text = t.replace(old, new_t)
+                break
 
     def shade(cell, hex_):
         tcPr = cell._tc.get_or_add_tcPr()
@@ -471,13 +604,29 @@ def build_docx(rows):
             borders.append(el)
         tblPr.append(borders)
 
-    # 1) 제목 '1차' → '2차'
+    # 1) 색상 범례를 보고서 첫머리(검사 개요 직후, '2. 테스트 케이스 목록' 앞)에 삽입 (강의자료 #10 지시)
+    anchor = None
     for p in d.paragraphs:
-        if "1차 검사 보고서" in p.text:
-            for r in p.runs:
-                if "1차" in r.text:
-                    r.text = r.text.replace("1차 검사 보고서", "2차 검사 보고서")
+        if p.style is not None and "Heading" in (p.style.name or "") and p.text.strip().startswith("2."):
+            anchor = p
             break
+    if anchor is not None:
+        anchor.insert_paragraph_before("색상 범례", style="Heading 2")
+        p1 = anchor.insert_paragraph_before("")
+        r = p1.add_run("● 검정(기본): ")
+        r.bold = True
+        p1.add_run("1차에서 검사했고 2차 구현물에서도 동일한 장면·방법으로 입력·동작함을 확신하여 선별 승계한 TC(복붙). 2~16절의 1차 TC가 이에 해당.")
+        p2 = anchor.insert_paragraph_before("")
+        r = p2.add_run("● 보라: ")
+        r.bold = True
+        r.font.color.rgb = NEW
+        p2.add_run("2차에서 처음 검사한 신규·변경 TC. 17절 '2차 확장 검사'에 모아 기재.")
+        p3 = anchor.insert_paragraph_before("")
+        r = p3.add_run(
+            f"※ 2차 구현물에서 더 이상 같은 장면·방법으로 입력할 수 없거나 결과가 달라진 1차 TC {removed}개는 "
+            f"본 보고서에서 삭제하고 17절의 신규 TC로 대체·재검증하였다."
+        )
+        r.italic = True
 
     # 2) 문서 맨 끝에 색상 범례 + 2차 섹션 추가
     d.add_page_break()
@@ -513,13 +662,14 @@ def build_docx(rows):
     chg = d.add_paragraph()
     chg.add_run(
         "다음 1차 기능은 2차 데이터 구조·규칙 변경으로 입력 방법 또는 결과가 바뀌어, 해당 1차 TC는 삭제하고 아래 신규 TC로 재검증하였다:\n"
-        "· 5.5 무결성: classrooms/schedules/prerequisites 3개 파일 추가, students(7필드)·courses(10필드)·config(3필드) 스키마 변경 → 5.5-12~22\n"
-        "· 6.3/6.13 회원가입·학생등록: 학년 입력 추가 → 6.3-14~15\n"
-        "· 6.7 개설과목 조회: 스케줄·강의실·제한 표시 및 학기 필터 → 6.7-7~9\n"
+        "· 5.5 무결성: classrooms/schedules/prerequisites 3개 파일 추가, students(7필드)·courses(10필드)·config(3필드) 스키마 변경, "
+        "행/필드 앞뒤 공백·빈 행 검사 신설(기획서 5.1의 1차 미구현 항목을 2차에서 구현) → 5.5-12~25\n"
+        "· 6.3/6.13 회원가입·학생등록: 학년 입력 추가 → 6.3-14~15, 6.13-10\n"
+        "· 6.7 개설과목 조회: 스케줄·강의실·제한 표시, 학기 필터, 신청 불가 과목 [제한] 표시 → 6.7-7~11\n"
         "· 6.9 수강신청: 7단계 → 11단계(학기·학년·학과·선수과목), 충돌이 스케줄 기반으로 변경 → 6.9-15~21\n"
         "· 6.12 시간표: 스케줄 기반 출력, 동일 과목 복수 요일 표시, 학점 중복 합산 방지 → 6.12-4~5\n"
-        "· 6.14 강의 수정: 통합 수정 → 항목별 수정으로 재설계(기간별 항목 제한, 정원/강의실 제약) → 6.14-16~29\n"
-        "· 6.15 기간 설정: 학기 입력 추가 → 6.15-7~8\n"
+        "· 6.14 강의 수정: 통합 수정 → 항목별 수정으로 재설계(기간별 항목 제한, 정원/강의실 제약) → 6.14-16~31\n"
+        "· 6.15 기간 설정: 학기 입력 추가 → 6.15-7~9\n"
         "· 6.17 강의실 관리: 신규 메뉴 → 6.17-1~3"
     )
 
@@ -530,6 +680,7 @@ def build_docx(rows):
         ("6.7  개설 과목 조회 — 스케줄·제한·학기", "6.7"),
         ("6.9  수강신청 — 11단계 검사", "6.9"),
         ("6.12 내 시간표 — 스케줄 기반", "6.12"),
+        ("6.13 관리자 학생 관리 — 학년", "6.13"),
         ("6.14 강의 등록·수정 — 스케줄·항목별 수정", "6.14"),
         ("6.15 수강신청 기간 설정 — 학기", "6.15"),
         ("6.17 강의실 관리 — 신규", "6.17"),
@@ -571,7 +722,8 @@ def build_docx(rows):
     summ.add_run(f"· 전체 TC: {kept} + {len(rows)} = {kept + len(rows)}개")
 
     d.save(str(out))
-    print(f"[build] removed {removed} invalid 1차 TCs; kept {kept}; added {len(rows)} 2차 TCs")
+    print(f"[build] removed {removed} invalid 1차 TCs; kept {kept}; added {len(rows)} 2차 TCs; "
+          f"renamed dup IDs: {renamed}")
     return out
 
 

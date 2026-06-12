@@ -160,45 +160,36 @@ def _limit_text(course) -> str:
     return "/".join(parts) if parts else "없음"
 
 
-def _print_courses(courses, schedules, classrooms, current_counts=None, show_capacity=True) -> None:
+def _print_courses(courses, schedules, classrooms, student=None) -> None:
+    """기획서 6.7.1/6.7.2 표 출력. student가 주어지면 학년·학과 제한 위반 과목에 [제한] 표시 (기획서 7절)."""
     if not courses:
         print("조회 결과가 없습니다.")
         return
-    if show_capacity:
-        hdr = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 스케줄 | 담당교수 | 강의실 | 정원 | 제한"
-    else:
-        hdr = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 스케줄 | 담당교수 | 강의실 | 제한"
+    hdr = "번호 | 과목코드 | 분반코드 | 과목명 | 학점 | 스케줄 | 담당교수 | 강의실 | 정원 | 제한"
     print(hdr)
     print(_header_sep(hdr))
     for i, course in enumerate(courses, 1):
         sched_t = _schedule_text(course.key(), schedules)
         room_t = _room_text(course.key(), schedules, classrooms)
         limit_t = _limit_text(course)
-        if show_capacity:
-            now = current_counts[course.key()] if current_counts and course.key() in current_counts else 0
-            print(
-                f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
-                f"{sched_t} | {course.professor} | {room_t} | {course.capacity} (현재 {now}) | {limit_t}"
-            )
-        else:
-            print(
-                f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
-                f"{sched_t} | {course.professor} | {room_t} | {limit_t}"
-            )
+        if student is not None:
+            grade_ok = course.limit_grade == 0 or course.limit_grade == student.grade
+            major_ok = course.limit_major == "전체" or course.limit_major == student.major
+            if not (grade_ok and major_ok):
+                limit_t += " [제한]"
+        print(
+            f"{i} | {course.code} | {course.section} | {course.name} | {course.credits} | "
+            f"{sched_t} | {course.professor} | {room_t} | {course.capacity} | {limit_t}"
+        )
 
 
-def _enrolled_counts(enrollments) -> dict[tuple[str, str], int]:
-    latest = {}
-    for e in enrollments:
-        latest[(e.student_id, e.key())] = e.status
-    counts: dict[tuple[str, str], int] = {}
-    for (_, key), status in latest.items():
-        if status == "enrolled":
-            counts[key] = counts.get(key, 0) + 1
-    return counts
+def _student_menu(student_service, courses, enrollments, config, schedules, classrooms, prerequisites,
+                  store, students, admins, completed) -> None:
+    def save():
+        # 기획서 2.3 '즉시 반영' / 설계 7.15: 상태 변경 직후 즉시 저장
+        _save_all(store, students, admins, courses, enrollments, completed, config,
+                  schedules, classrooms, prerequisites)
 
-
-def _student_menu(student_service, courses, enrollments, config, schedules, classrooms, prerequisites) -> None:
     while True:
         print("\n----------------------------------------")
         print(
@@ -228,7 +219,7 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
 
         if choice == "1":
             print(f"===== 개설 과목 목록 ({config.semester}) =====")
-            _print_courses(student_service.list_courses(), schedules, classrooms, _enrolled_counts(enrollments))
+            _print_courses(student_service.list_courses(), schedules, classrooms, student_service.student)
             input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         elif choice == "2":
             # 기획서 6.7.2: 과목 검색 → (선택) 번호. 단독 조회이므로 선택 결과는 사용하지 않음
@@ -266,16 +257,19 @@ def _student_menu(student_service, courses, enrollments, config, schedules, clas
                 print(f"기이수 과목으로 추가되었습니다: {course.name}")
             else:
                 print(msg)
+            save()
         elif choice == "5":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
             _do_register(student_service, schedules, classrooms, prerequisites)
+            save()
         elif choice == "6":
             if not student_service.is_registration_open():
                 print("!!! 안내: 현재 수강신청 기간이 아닙니다.")
                 continue
             _do_cancel(student_service)
+            save()
         elif choice == "7":
             history = student_service.enrollment_history()
             if not history:
@@ -316,7 +310,7 @@ def _search_and_select_course(student_service, schedules, classrooms):
             if retry != "1":
                 return None
             continue
-        _print_courses(results, schedules, classrooms, show_capacity=False)
+        _print_courses(results, schedules, classrooms, student_service.student)
         print(f"총 {len(results)}건 검색됨.")
         while True:
             sel = input("선택 번호 입력 (0: 돌아가기) > ").strip()
@@ -337,7 +331,7 @@ def _print_course_detail(selected, schedules, classrooms, prerequisites, courses
     prereq_codes = sorted(prerequisites.get(selected.code, set()))
     if prereq_codes:
         names = ", ".join(
-            f"[{pc}] " + next((c.name for c in courses.values() if c.code == pc), "")
+            next((c.name for c in courses.values() if c.code == pc), pc)
             for pc in prereq_codes
         )
         print(f"선수과목: {names}")
@@ -364,7 +358,7 @@ def _do_register(student_service, schedules, classrooms, prerequisites) -> None:
         if not results:
             print("검색 결과가 없습니다.")
             return
-        _print_courses(results, schedules, classrooms, show_capacity=False)
+        _print_courses(results, schedules, classrooms, student_service.student)
         print(f"총 {len(results)}건 검색됨.")
         pick = input("번호 선택 (0: 돌아가기) > ").strip()
         if pick == "0":
@@ -428,34 +422,33 @@ def _print_timetable(student_service, classrooms) -> None:
         if not items:
             print(f"[{day}] 없음")
         else:
-            for course, schedule in items:
+            for idx, (course, schedule) in enumerate(items):
                 name = course.name if len(course.name) <= 15 else course.name[:15] + "..."
                 room = classrooms.get(schedule.classroom_code)
                 room_t = room.display_name() if room else schedule.classroom_code
+                # 같은 요일 두 번째 줄부터는 요일 라벨 대신 들여쓰기 (기획서 6.12 목업)
+                prefix = f"[{day}]" if idx == 0 else " " * (len(day) + 2)
                 print(
-                    f"[{day}] {to_hhmm(schedule.start_time)} ~ {to_hhmm(schedule.end_time)} "
+                    f"{prefix} {to_hhmm(schedule.start_time)} ~ {to_hhmm(schedule.end_time)} "
                     f"{name} ({course.code}-{course.section}) | {room_t} | {course.credits}학점 | {course.professor}"
                 )
     print(f"총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
 
 
-def _input_course_basic() -> Course | None:
+def _input_course_basic() -> dict | None:
+    """강의 등록 기본 필드 입력 (정원은 스케줄 등록 후 입력 — 설계 7.11)."""
     print("===== 강의 등록 =====")
     code = input("과목코드 (숫자 4자리) > ").strip()
     section = input("분반코드 (숫자 2자리) > ").strip()
     name = input("과목명 > ").strip()
     credits_s = input("학점 (1~6 정수) > ").strip()
     professor = input("담당교수 > ").strip()
-    capacity_s = input("정원 (1 이상의 정수) > ").strip()
     semester = input("학기 (YYYY-S 형식, 예: 2026-1) > ").strip()
     limit_grade_s = input("제한학년 (0: 제한없음 / 1~4: 해당학년만) > ").strip()
     limit_major = input("제한학과 (전체 / 특정 전공명 입력) > ").strip()
 
     if not credits_s.isdigit() or not (1 <= int(credits_s) <= 6):
         print("!!! 오류: 학점은 1~6 사이의 정수여야 합니다.")
-        return None
-    if not capacity_s.isdigit() or int(capacity_s) < 1:
-        print("!!! 오류: 정원은 1 이상의 정수여야 합니다.")
         return None
     if not (limit_grade_s.isdigit() and 0 <= int(limit_grade_s) <= 4):
         print("!!! 오류: 제한학년은 0 이상 4 이하의 정수여야 합니다.")
@@ -464,11 +457,30 @@ def _input_course_basic() -> Course | None:
         print("!!! 오류: 제한학과를 입력해야 합니다.")
         return None
 
-    return Course(
-        code=code, section=section, name=name, credits=int(credits_s), professor=professor,
-        status="active", capacity=int(capacity_s), semester=semester,
-        limit_grade=int(limit_grade_s), limit_major=limit_major,
-    )
+    return {
+        "code": code, "section": section, "name": name, "credits": int(credits_s),
+        "professor": professor, "semester": semester,
+        "limit_grade": int(limit_grade_s), "limit_major": limit_major,
+    }
+
+
+def _input_capacity(new_schedules, classrooms) -> int:
+    """정원 입력 (설계 7.11: 스케줄 등록 후). 최소 좌석 초과 시 재입력 대기."""
+    rooms = [classrooms[s.classroom_code] for s in new_schedules if s.classroom_code in classrooms]
+    smallest = min(rooms, key=lambda r: r.seats) if rooms else None
+    while True:
+        capacity_s = input("정원 (1 이상의 정수) > ").strip()
+        if not capacity_s.isdigit() or int(capacity_s) < 1:
+            print("!!! 오류: 정원은 1 이상의 정수여야 합니다.")
+            continue
+        capacity = int(capacity_s)
+        if smallest and capacity > smallest.seats:
+            print(
+                f"!!! 오류: 정원은 가장 작은 강의실({smallest.display_name()}, {smallest.seats}석)의 "
+                f"좌석 수를 초과할 수 없습니다."
+            )
+            continue
+        return capacity
 
 
 def _input_schedules(code: str, section: str, classrooms) -> list[Schedule]:
@@ -631,7 +643,7 @@ def _classroom_menu(admin_service) -> None:
                 continue
             _, msg = admin_service.add_classroom(Classroom(rcode, building, room_no, int(seats_s)))
             print(msg)
-            return
+            input("엔터를 누르면 메뉴로 돌아갑니다. > ")
         else:
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
@@ -646,7 +658,7 @@ def _admin_menu(admin_service, colleges, store, students, admins, courses, enrol
         print("\n----------------------------------------")
         print("[관리자 메뉴] 관리자")
         print(
-            f"오늘 날짜: {config.current_date.isoformat()} | 학기: {config.semester} | "
+            f"오늘 날짜: {config.current_date.isoformat()} | "
             f"수강신청 기간: {config.reg_start.isoformat()} ~ {config.reg_end.isoformat()}"
         )
         print("----------------------------------------")
@@ -694,10 +706,17 @@ def _admin_menu(admin_service, colleges, store, students, admins, courses, enrol
             print(msg)
             save()
         elif choice == "4":
-            course = _input_course_basic()
-            if course is None:
+            fields = _input_course_basic()
+            if fields is None:
                 continue
-            new_schedules = _input_schedules(course.code, course.section, classrooms)
+            new_schedules = _input_schedules(fields["code"], fields["section"], classrooms)
+            capacity = _input_capacity(new_schedules, classrooms)
+            course = Course(
+                code=fields["code"], section=fields["section"], name=fields["name"],
+                credits=fields["credits"], professor=fields["professor"], status="active",
+                capacity=capacity, semester=fields["semester"],
+                limit_grade=fields["limit_grade"], limit_major=fields["limit_major"],
+            )
             _, msg = admin_service.add_course(course, new_schedules)
             print(msg)
             save()
@@ -772,11 +791,10 @@ def main() -> None:
     store = DataStore(data_dir)
     store.ensure_defaults(current_date)
 
-    # 기획서 5.5절: 무결성 검사
+    # 기획서 5.5절: 무결성 검사 (설계 7.2: 첫 번째 오류 메시지 출력 후 종료)
     errors = store.validate_integrity()
     if errors:
-        for err in errors:
-            print(f"!!! 오류: {err}")
+        print(f"!!! 오류: {errors[0]}")
         print("프로그램을 종료합니다.")
         return
 
@@ -820,7 +838,8 @@ def main() -> None:
                 student_service = StudentService(
                     user, courses, enrollments, completed, config, schedules, classrooms, prerequisites
                 )
-                _student_menu(student_service, courses, enrollments, config, schedules, classrooms, prerequisites)
+                _student_menu(student_service, courses, enrollments, config, schedules, classrooms, prerequisites,
+                              store, students, admins, completed)
                 _save_all(store, students, admins, courses, enrollments, completed, config,
                           schedules, classrooms, prerequisites)
             elif role == "admin":

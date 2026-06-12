@@ -44,14 +44,14 @@ class DataStore:
             self.admins_path.write_text("admin01,Admin@1234,관리자\n", encoding="utf-8")
 
         if not self.courses_path.exists():
-            # 기획서 5.2.3: 기본 과목 6개 (요일·시각 제거, 학기·제한학년·제한학과 추가)
+            # 기획서 5.2.3: 기본 과목 6개 (학기는 기획서 명세 그대로 2026-1 고정)
             self.courses_path.write_text(
-                f"1001,01,프로그래밍기초,3,김교수,active,30,{sem},0,전체\n"
-                f"1001,02,프로그래밍기초,3,이교수,active,30,{sem},0,전체\n"
-                f"1002,01,자료구조,3,박교수,active,25,{sem},2,컴퓨터공학부\n"
-                f"1003,01,알고리즘,3,최교수,active,20,{sem},3,컴퓨터공학부\n"
-                f"2001,01,영어회화,2,존교수,active,40,{sem},0,전체\n"
-                f"3001,01,미적분학,3,정교수,active,35,{sem},0,전체\n",
+                "1001,01,프로그래밍기초,3,김교수,active,30,2026-1,0,전체\n"
+                "1001,02,프로그래밍기초,3,이교수,active,30,2026-1,0,전체\n"
+                "1002,01,자료구조,3,박교수,active,25,2026-1,2,컴퓨터공학부\n"
+                "1003,01,알고리즘,3,최교수,active,20,2026-1,3,컴퓨터공학부\n"
+                "2001,01,영어회화,2,존교수,active,40,2026-1,0,전체\n"
+                "3001,01,미적분학,3,정교수,active,35,2026-1,0,전체\n",
                 encoding="utf-8",
             )
 
@@ -353,6 +353,21 @@ class DataStore:
     def validate_integrity(self) -> list[str]:
         errors: list[str] = []
 
+        # 기획서 5.1 공통 형식: 완전히 빈 행 불허, 행/필드 앞뒤 표준 공백(U+0020) 불허
+        for name, path in (
+            ("students.txt", self.students_path),
+            ("admins.txt", self.admins_path),
+            ("courses.txt", self.courses_path),
+            ("enrollments.txt", self.enrollments_path),
+            ("completed_courses.txt", self.completed_path),
+            ("colleges.txt", self.colleges_path),
+            ("config.txt", self.config_path),
+            ("classrooms.txt", self.classrooms_path),
+            ("schedules.txt", self.schedules_path),
+            ("prerequisites.txt", self.prerequisites_path),
+        ):
+            errors.extend(self._check_common_format(name, path))
+
         errors.extend(self._check_students_syntax())
         errors.extend(self._check_admins_syntax())
         errors.extend(self._check_courses_syntax())
@@ -368,6 +383,21 @@ class DataStore:
             return errors
 
         errors.extend(self._check_referential_integrity())
+        return errors
+
+    @staticmethod
+    def _check_common_format(name: str, path: Path) -> list[str]:
+        """기획서 5.1 공통 규칙: 완전히 빈 행 / 행·필드 앞뒤 표준 공백(U+0020) 금지."""
+        errors: list[str] = []
+        if not path.exists():
+            return errors
+        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            clean = line.lstrip("﻿")
+            if not clean.strip():
+                errors.append(f"{name} {line_no}행 - 문법 형식이 올바르지 않습니다: '완전히 빈 행 불허'")
+                continue
+            if clean != clean.strip(" ") or any(f != f.strip(" ") for f in clean.split(",")):
+                errors.append(f"{name} {line_no}행 - 문법 형식이 올바르지 않습니다: '행/필드 앞뒤 공백 불허'")
         return errors
 
     def _check_students_syntax(self) -> list[str]:

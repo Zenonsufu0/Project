@@ -250,10 +250,11 @@ class StudentService:
         return result
 
     def _course_name(self, code: str) -> str:
+        # 기획서 6.9 11단계: 미이수 선수과목은 '과목명'을 나열한다.
         for course in self.courses.values():
             if course.code == code:
-                return f"[{code}] {course.name}"
-        return f"[{code}]"
+                return course.name
+        return code
 
     def _course_code_exists(self, code: str) -> bool:
         return any(course.code == code for course in self.courses.values())

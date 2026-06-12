@@ -543,9 +543,19 @@ def _delete_invalid_1cha_rows(d):
     return removed
 
 
+# 상호작용 화면 TC 스크린샷 (_gen_tc_screenshots.py 산출물). 화면 공유 TC는 같은 캡처 사용.
+SHOT_DIR = ROOT / "발표준비" / "_tc_shots"
+SHOT_SHARE = {"6.7-8": "6.7-7", "6.7-9": "6.7-7", "6.7-10": "6.7-7", "6.12-5": "6.12-4"}
+
+
+def _shot_path(tid: str):
+    p = SHOT_DIR / f"{SHOT_SHARE.get(tid, tid)}.png"
+    return p if p.exists() else None
+
+
 def build_docx(rows):
     import docx
-    from docx.shared import Pt, RGBColor
+    from docx.shared import Cm, Pt, RGBColor
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
@@ -635,7 +645,8 @@ def build_docx(rows):
     lead = d.add_paragraph()
     lead.add_run(
         "본 17절은 2차 확장(설계문서 원판 기준)으로 추가·변경된 기능에 대한 실측 검사 결과이다. "
-        "각 TC의 '실제 결과'는 서비스/스토리지 계층을 직접 호출하여 실측한 값이다."
+        "각 TC의 '실제 결과'는 실측한 값이며, 상호작용 화면 TC에는 실제 프로그램 실행 화면 캡처를 함께 첨부하였다. "
+        "파일 자동 생성·단일 오류 메시지 출력 등 동작이 자명한 TC는 텍스트로만 기재한다."
     )
 
     # 색상 범례
@@ -712,6 +723,10 @@ def build_docx(rows):
             ar = cells[3].paragraphs[0].add_run(actual if not actual.startswith("[EXC]") else actual)
             # 실제결과가 예상과 부합하면 검정, EXC면 빨강
             ar.font.color.rgb = RGBColor(0xC0, 0x00, 0x00) if actual.startswith("[EXC]") else BLACK
+            shot = _shot_path(tid)
+            if shot is not None:
+                pic_par = cells[3].add_paragraph()
+                pic_par.add_run().add_picture(str(shot), width=Cm(8.0))
 
     # 요약
     kept = 129 - removed

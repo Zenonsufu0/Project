@@ -152,7 +152,7 @@ def build():
          align=WD_ALIGN_PARAGRAPH.CENTER, space_after=18)
     para(doc, ("팀명: B04 (5인)", {"size": 13, "bold": True}), align=WD_ALIGN_PARAGRAPH.CENTER, space_after=10)
 
-    heading(doc, "팀원 명단 및 동료평가 평점 (잠정 합의)", size=13, before=6)
+    heading(doc, "팀원 명단 및 동료평가 평점", size=13, before=6)
     table(doc,
           ["학번", "이름", "주 담당 모듈", "동료평가 평점"],
           [["202312363", "이강준", "main.py (UI·흐름)", "3"],
@@ -161,8 +161,8 @@ def build():
            ["202312364", "이도현", "student_service.py (수강신청)", "3"],
            ["202312356", "신경환", "admin_service.py (관리자)", "3"]],
           widths=[3.2, 2.4, 6.5, 3.2])
-    para(doc, ("⚠ 동료평가 평점은 발표 전 팀원 합의로 확정하여 위 표를 수정할 것 (표지 필수 항목). "
-               "평점 {3,2,1,0} 중 하나, 자기 자신 포함.", {"size": 9.5, "color": BAD}), space_after=2)
+    para(doc, ("동료평가 평점: 팀원 전원 3점 — 성실성·기여도에 문제 없이 각자 맡은 분업을 수행함 (팀 합의 완료). "
+               "평점 척도 {3,2,1,0}, 자기 자신 포함.", {"size": 9.5, "color": RGBColor(0x55, 0x55, 0x55)}), space_after=2)
 
     doc.add_page_break()
 

@@ -134,6 +134,37 @@ def _input_grade() -> int:
         print("!!! 오류: 학년은 1 이상 4 이하의 정수이어야 합니다.")
 
 
+def _collect_student_fields(auth_service, colleges):
+    """기획서 6.3 / 6.13.1: 학번·비번·이름·단과대·전공·학년을 항목별 재대기로 입력받아 반환.
+    학번은 형식·중복 위반 시, 비밀번호·이름은 형식 위반 시 해당 항목 재대기. (취소 시 None)"""
+    while True:
+        student_id = input("학번 (숫자 9자리) > ").strip()
+        ok, msg = auth_service.validate_student_id(student_id)
+        if ok:
+            break
+        print(f"!!! 오류: {msg}")
+    while True:
+        password = input("비밀번호 > ").strip()
+        ok, msg = auth_service.validate_password_format(password, user_type="student")
+        if ok:
+            break
+        print(f"!!! 오류: {msg}")
+    while True:
+        name = input("이름 (한국어 완성형) > ").strip()
+        if not name:
+            continue
+        ok, msg = auth_service.validate_name(name)
+        if ok:
+            break
+        print(f"!!! 오류: {msg}")
+    selected = _choose_college_major(colleges)
+    if selected is None:
+        return None
+    college, major = selected
+    grade = _input_grade()
+    return student_id, password, name, college, major, grade
+
+
 def _schedule_text(key, schedules) -> str:
     scheds = schedules.get(key, [])
     if not scheds:
@@ -349,9 +380,12 @@ def _do_register(student_service, schedules, classrooms, prerequisites) -> None:
     if (len(parts) == 2 and parts[0].isdigit() and len(parts[0]) == 4
             and parts[1].isdigit() and len(parts[1]) == 2):
         # 과목코드+분반코드 직접 입력
-        selected = student_service.courses.get((parts[0], parts[1]))
+        code, section = parts[0], parts[1]
+        selected = student_service.courses.get((code, section))
         if not selected or selected.status != "active":
-            print("검색 결과가 없습니다.")
+            # 존재하지 않는 과목코드/분반 또는 inactive → register()가 설계 6.9 1~3단계 메시지 출력
+            _, msg, _ = student_service.register(code, section)
+            print(msg)
             return
     else:
         # 과목명 검색 분기 (기획서 6.9 형식)
@@ -394,12 +428,13 @@ def _do_cancel(student_service) -> None:
         retake = "Y" if student_service.is_retake(key[0]) else "N"
         items.append(key)
         print(f"{i} | {key[0]} | {key[1]} | {name} | {credits} | {retake}")
-    pick = input("취소할 과목 번호 입력 (0: 돌아가기) > ").strip()
-    if pick == "0":
-        return
-    if not pick.isdigit() or int(pick) < 1 or int(pick) > len(items):
-        print("!!! 오류: 잘못된 번호입니다.")
-        return
+    while True:
+        pick = input("취소할 과목 번호 입력 (0: 돌아가기) > ").strip()
+        if pick == "0":
+            return
+        if pick.isdigit() and 1 <= int(pick) <= len(items):
+            break
+        print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
     code, section = items[int(pick) - 1]
     course = student_service.courses.get((code, section))
     name = course.name if course else f"{code}-{section}"
@@ -436,11 +471,17 @@ def _print_timetable(student_service, classrooms) -> None:
     print(f"총 신청 학점: {student_service.current_credits()} / {StudentService.MAX_CREDITS}")
 
 
-def _input_course_basic() -> dict | None:
-    """강의 등록 기본 필드 입력 (정원은 스케줄 등록 후 입력 — 설계 7.11)."""
+def _input_course_basic(courses) -> dict | None:
+    """강의 등록 기본 필드 입력 (정원은 스케줄 등록 후 입력 — 설계 7.11).
+    과목코드+분반코드가 이미 존재하면 과목코드 입력 프롬프트로 복귀 (기획서 6.14.1)."""
     print("===== 강의 등록 =====")
-    code = input("과목코드 (숫자 4자리) > ").strip()
-    section = input("분반코드 (숫자 2자리) > ").strip()
+    while True:
+        code = input("과목코드 (숫자 4자리) > ").strip()
+        section = input("분반코드 (숫자 2자리) > ").strip()
+        if (code, section) in courses:
+            print("!!! 오류: 이미 존재하는 개설 강의입니다.")
+            continue
+        break
     name = input("과목명 > ").strip()
     credits_s = input("학점 (1~6 정수) > ").strip()
     professor = input("담당교수 > ").strip()
@@ -667,7 +708,7 @@ def _classroom_menu(admin_service) -> None:
             print("!!! 오류: 잘못된 입력입니다. 다시 선택하세요.")
 
 
-def _admin_menu(admin_service, colleges, store, students, admins, courses, enrollments,
+def _admin_menu(admin_service, auth_service, colleges, store, students, admins, courses, enrollments,
                 completed, config, schedules, classrooms, prerequisites) -> None:
     def save():
         _save_all(store, students, admins, courses, enrollments, completed, config,
@@ -697,14 +738,10 @@ def _admin_menu(admin_service, colleges, store, students, admins, courses, enrol
 
         if choice == "1":
             print("===== 학생 등록 =====")
-            sid = input("학번 (숫자 9자리) > ").strip()
-            pw = input("비밀번호 > ").strip()
-            name = input("이름 (한국어 완성형) > ").strip()
-            selected = _choose_college_major(colleges)
-            if selected is None:
+            fields = _collect_student_fields(auth_service, colleges)
+            if fields is None:
                 continue
-            college, major = selected
-            grade = _input_grade()
+            sid, pw, name, college, major, grade = fields
             _, msg = admin_service.register_student(Student(sid, pw, name, college, major, "active", grade))
             print(msg)
             save()
@@ -759,7 +796,7 @@ def _admin_menu(admin_service, colleges, store, students, admins, courses, enrol
                 input("엔터를 누르면 메뉴로 돌아갑니다. > ")
                 break
         elif choice == "4":
-            fields = _input_course_basic()
+            fields = _input_course_basic(courses)
             if fields is None:
                 continue
             new_schedules = _input_schedules(fields["code"], fields["section"], classrooms)
@@ -943,42 +980,17 @@ def main() -> None:
                     students, courses, enrollments, completed, colleges, config,
                     schedules, classrooms, prerequisites
                 )
-                _admin_menu(admin_service, colleges, store, students, admins, courses, enrollments,
+                _admin_menu(admin_service, auth_service, colleges, store, students, admins, courses, enrollments,
                             completed, config, schedules, classrooms, prerequisites)
                 _save_all(store, students, admins, courses, enrollments, completed, config,
                           schedules, classrooms, prerequisites)
 
         elif choice == "2":
             print("\n===== 회원가입 =====")
-            while True:
-                student_id = input("학번 (숫자 9자리) > ").strip()
-                is_valid, msg = auth_service.validate_student_id(student_id)
-                if is_valid:
-                    break
-                print(f"!!! 오류: {msg}")
-
-            while True:
-                password = input("비밀번호 > ").strip()
-                is_valid, msg = auth_service.validate_password_format(password, user_type="student")
-                if is_valid:
-                    break
-                print(f"!!! 오류: {msg}")
-
-            while True:
-                name = input("이름 (한국어 완성형) > ").strip()
-                if not name:
-                    continue
-                is_valid, msg = auth_service.validate_name(name)
-                if is_valid:
-                    break
-                print(f"!!! 오류: {msg}")
-
-            selected = _choose_college_major(colleges)
-            if selected is None:
+            fields = _collect_student_fields(auth_service, colleges)
+            if fields is None:
                 continue
-            college, major = selected
-
-            grade = _input_grade()
+            student_id, password, name, college, major, grade = fields
 
             ok, _msg, _ = auth_service.signup_student(
                 student_id=student_id,

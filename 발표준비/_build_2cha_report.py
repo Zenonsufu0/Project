@@ -553,6 +553,80 @@ def _shot_path(tid: str):
     return p if p.exists() else None
 
 
+def _set_para_text(p, text):
+    if p.runs:
+        p.runs[0].text = text
+        for r in p.runs[1:]:
+            r.text = ""
+    else:
+        p.add_run(text)
+
+
+def _swap_carried_shots(d, tids):
+    """CARRIED TC의 stale 1차 스크린샷을 현행 2차 캡처(_tc_shots/{tid}.png)로 교체."""
+    import re as _re
+    from docx.shared import Cm
+    swapped = []
+    for tbl in d.tables:
+        for row in tbl.rows:
+            m = _re.match(r"(\d+\.\d+-\d+)", row.cells[0].text.strip())
+            if not m or m.group(1) not in tids:
+                continue
+            png = SHOT_DIR / f"{m.group(1)}.png"
+            if not png.exists():
+                continue
+            cell = row.cells[-1]
+            for para in list(cell.paragraphs):
+                para._element.getparent().remove(para._element)
+            cell.add_paragraph().add_run().add_picture(str(png), width=Cm(8.0))
+            swapped.append(m.group(1))
+    return swapped
+
+
+def _fix_6134_input(d):
+    """6.13-4 입력 칼럼의 '→ 1 선택'(코드가 확인창 전 종료해 도달 불가) 제거."""
+    import re as _re
+    for tbl in d.tables:
+        for row in tbl.rows:
+            if row.cells[0].text.strip().startswith("6.13-4"):
+                c = row.cells[1]
+                t2 = _re.sub(r"\s*→\s*[‘'\"]?1[’'\"]?\s*선택", "", c.text)
+                if t2 != c.text:
+                    _set_para_text(c.paragraphs[0], t2)
+                    for p in c.paragraphs[1:]:
+                        _set_para_text(p, "")
+                return
+
+
+def _fix_toc_numbering(d):
+    """목차/본문 '2.N' 중복(2.6 두 번) 순차 재번호 + 목차에 17절 1줄 추가."""
+    import re as _re
+
+    def _renum(text, n):  # 앞 공백(들여쓰기) 보존하며 2.N 치환
+        return _re.sub(r"^(\s*)2\.\d+", lambda m: f"{m.group(1)}2.{n}", text)
+
+    seq = 0
+    for p in d.paragraphs:
+        if p.style and p.style.name == "Heading 2" and _re.match(r"^\s*2\.\d+\s", p.text):
+            seq += 1
+            _set_para_text(p, _renum(p.text, seq))
+    # 목차 항목 = 본문 표 밖(d.paragraphs)에서 '2.N '으로 시작하는 Normal 문단 (TOC 전용)
+    toc = [p for p in d.paragraphs
+           if p.style and p.style.name == "Normal" and _re.match(r"^\s*2\.\d+\s", p.text)]
+    for i, p in enumerate(toc, 1):
+        _set_para_text(p, _renum(p.text, i))
+    if toc:
+        from copy import deepcopy
+        from docx.text.paragraph import Paragraph
+        anchor = toc[-1]
+        newp = deepcopy(anchor._p)
+        anchor._p.addnext(newp)
+        _set_para_text(
+            Paragraph(newp, anchor._parent),
+            "17. 2차 확장 검사 (신규·변경 TC) — 5.5/6.3/6.7/6.9/6.12/6.13/6.14/6.15/6.17 신규 53건",
+        )
+
+
 def build_docx(rows):
     import docx
     from docx.shared import Cm, Pt, RGBColor
@@ -566,6 +640,16 @@ def build_docx(rows):
 
     removed = _delete_invalid_1cha_rows(d)
     renamed = _renumber_duplicate_ids(d)
+    swapped = _swap_carried_shots(d, {"6.10-1", "6.10-3", "6.10-6"})
+    _fix_6134_input(d)
+    _fix_toc_numbering(d)
+    # 모든 섹션 머리글/바닥글의 '1차' → '2차' (페이지마다 반복되는 머리글 포함)
+    for sec in d.sections:
+        for hf in (sec.header, sec.footer):
+            for p in hf.paragraphs:
+                for r in p.runs:
+                    if "1차 검사" in r.text:
+                        r.text = r.text.replace("1차 검사", "2차 검사")
 
     NEW = RGBColor(0x70, 0x30, 0xA0)   # 보라 = 2차 신규/변경 검사
     BLACK = RGBColor(0, 0, 0)
@@ -738,7 +822,7 @@ def build_docx(rows):
 
     d.save(str(out))
     print(f"[build] removed {removed} invalid 1차 TCs; kept {kept}; added {len(rows)} 2차 TCs; "
-          f"renamed dup IDs: {renamed}")
+          f"renamed dup IDs: {renamed}; swapped shots: {swapped}")
     return out
 
 
